@@ -1,8 +1,8 @@
 % =====================================================================
 %  Livrable 1 : question de recherche, collecte, description du dataset,
-%  prétraitement, faisabilité. Chiffres issus du code de la branche main
-%  (manifestes/niveau2_2026-10-26.json), de analyse/description.py et de
-%  analyse/faisabilite.py.
+%  prétraitement, faisabilité. Chiffres mis à jour le 09/11/2026 avec le code
+%  local (manifestes/niveau2_2026-11-09.json, niveau3_2026-11-09.json),
+%  analyse/description.py et analyse/faisabilite.py.
 % =====================================================================
 
 \section{Question de recherche}
@@ -22,21 +22,21 @@ d'anticiper les tensions d'approvisionnement ; comprendre pourquoi, d'agir sur l
 
 \begin{quote}
 \large\textbf{Q1, effet cascade.} Une rupture se propage-t-elle aux substances de la même classe, qui servent de
-substituts ?
-
-\bigskip
-\large\textbf{Q2, pénuries importées.} Une pénurie déjà présente en Italie, en Allemagne ou dans un autre pays de
-l'Union européenne annonce-t-elle la pénurie française ?
+substituts ?\par\smallskip
+\large\textbf{Q2, pénuries importées.} Une pénurie déjà publiée en Italie, en Suède, en Tchéquie, en Slovaquie, en Norvège
+ou en Allemagne annonce-t-elle la pénurie française ?
 \end{quote}
 
-Périmètre : la France (seul pays avec tous les médicaments commercialisés) et 1\,223 substances à médicament
-d'intérêt thérapeutique majeur (MITM), seules soumises à déclaration. Pour Q2, l'Italie et l'Allemagne sont déjà intégrées ; d'autres pays de l'Union pourront s'y ajouter.
+Périmètre : la France (seul pays avec tous les médicaments commercialisés) et 885 substances à médicament
+d'intérêt thérapeutique majeur (MITM, seules soumises à déclaration) délivrées en ville ; six pays européens servent de signaux.
 
 \section{Collecte et construction du dataset}
 
-Toutes les données viennent de sources officielles et publiques : ANSM, BDPM, Open Medic, AIFA (Italie) et BfArM
-(Allemagne). Ces listes ne montrent que le \emph{présent} : pour reconstruire le passé, nous avons récupéré les
-\textbf{archives de la Wayback Machine}, des photos environ mensuelles quand elles existent (tableau~\ref{tab:pays}).
+Toutes les données viennent de sources officielles et publiques : ANSM, BDPM, Open Medic et Medic'AM pour la France ;
+AIFA, BfArM, DMP, Läkemedelsverket, SÚKL et ŠÚKL pour l'Italie, l'Allemagne, la Norvège, la Suède, la Tchéquie et la
+Slovaquie. Les listes ne montrent que le \emph{présent} : pour le passé, nous avons récupéré les \textbf{archives de la
+Wayback Machine} (dont l'ancien site de l'ANSM, 2015-2021) ; la Suède, la Tchéquie et la Slovaquie publient des registres
+historiques complets (tableau~\ref{tab:pays}).
 
 \textbf{Une construction en trois niveaux}, comme un entrepôt de données : nous y appliquons les éléments du cours
 \emph{Building a Dataset from a Warehouse} et du TP MegaStore.
@@ -51,10 +51,10 @@ Toutes les données viennent de sources officielles et publiques : ANSM, BDPM, O
   titre/.style={fill=#1, text=white, font=\footnotesize\bfseries, rounded corners=3pt, inner xsep=6pt,
                 inner ysep=2.5pt, text height=1.9ex, text depth=0.5ex, anchor=south west},
   fleche/.style={-{Latex[length=5pt, width=6pt]}, line width=1.4pt, gray!45}]
-\node[niveau=niveaubrut] (brut) {289 fichiers sources, gardés tels quels, en lecture seule, et tracés (adresse, date, empreinte)};
-\node[niveau=niveaupropre, right=0.5cm of brut] (propre) {22 tables en étoile : \textbf{grain} vérifié, médicaments
+\node[niveau=niveaubrut] (brut) {environ 800 fichiers sources, gardés tels quels, en lecture seule, et tracés (adresse, date, empreinte)};
+\node[niveau=niveaupropre, right=0.5cm of brut] (propre) {25 tables en étoile : \textbf{grain} vérifié, médicaments
   \textbf{historisés} (jointure \emph{as-of}), \textbf{contrôles} et manifeste};
-\node[niveau=niveaufinal, right=0.5cm of propre] (final) {\textbf{panel\_fr} : 99\,063 lignes (substance $\times$ mois), variables connues avant, cible après};
+\node[niveau=niveaufinal, right=0.5cm of propre] (final) {\textbf{panel\_fr} : 58\,410 lignes (substance $\times$ mois), variables connues avant, cible après};
 \node[titre=niveaubrut] at ([xshift=6pt, yshift=2pt]brut.north west) {1 \enspace BRUT};
 \node[titre=niveaupropre] at ([xshift=6pt, yshift=2pt]propre.north west) {2 \enspace NETTOYÉ};
 \node[titre=niveaufinal] at ([xshift=6pt, yshift=2pt]final.north west) {3 \enspace FINAL};
@@ -69,7 +69,7 @@ Toutes les données viennent de sources officielles et publiques : ANSM, BDPM, O
 \begin{figure}[H]
 \centering
 \includegraphics[width=0.78\linewidth]{figures/evolution_penuries.pdf}
-\caption{Pénuries en cours par archive (zones grises : plus de 100 jours sans archive).}
+\caption{Pénuries en cours par archive, pays observés par photos (zones grises : plus de 100 jours sans archive).}
 \label{fig:evolution}
 \end{figure}
 
@@ -77,28 +77,32 @@ Toutes les données viennent de sources officielles et publiques : ANSM, BDPM, O
 \includegraphics[width=\linewidth]{figures/durees_france.pdf}
 \end{minipage}\hfill
 \begin{minipage}[c]{0.51\linewidth}\small
-\textbf{Durées (France, \textbf{1\,130} pénuries terminées).} Distribution asymétrique (moyenne 209\,j, médiane \textbf{128\,j},
-quartiles \textbf{53 et 284\,j}, \textbf{18\,\%} au-delà d'un an) : nous retenons médiane et quartiles, pas la moyenne. Les valeurs extrêmes
+\textbf{Durées (France, \textbf{1\,754} pénuries terminées).} Distribution asymétrique (moyenne 192\,j, médiane \textbf{109\,j},
+quartiles \textbf{41 et 257\,j}, \textbf{16\,\%} au-delà d'un an) : nous retenons médiane et quartiles, pas la moyenne. Les valeurs extrêmes
 sont conservées, car exceptionnelles mais exactes.
 \end{minipage}
 
 \smallskip
-\textbf{35\,\%} des substances commercialisées ont connu une pénurie en France depuis 2021. Les signalements suivent la
-consommation (Spearman \textbf{0,61}) et le nombre de présentations (\textbf{0,79}), lié lui aussi à la consommation (0,68) : lien confondu (cohorte, 858 substances).
+\textbf{39\,\%} des substances commercialisées ont connu une pénurie en France depuis 2015. Les signalements suivent la
+consommation (Spearman \textbf{0,61}) et le nombre de présentations (\textbf{0,79}) : lien confondu.
 
 \begin{table}[H]
 \centering\footnotesize
 \renewcommand{\arraystretch}{1.2}
 \rowcolors{2}{white}{niveaubrut!6}
-\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{4.0cm} *{3}{>{\centering\arraybackslash}X}}
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{1.8cm} >{\raggedright\arraybackslash}X r r >{\raggedright\arraybackslash}p{2.6cm}}
 \rowcolor{niveaubrut!16}
-\entete{Épisodes de pénurie} & \entete{France (ANSM)} & \entete{Italie (AIFA)} & \entete{Allemagne (BfArM)} \\
-Nombre (dont en cours) & 1\,599 (180) & 10\,035 (2\,169) & 2\,000 (549) \\
-Substances · ATC connu & 543 · 94,1\,\% & 1\,073 · 93,5\,\% & 509 · 96,8\,\% \\
-Photos · période & 59 · 04/2021--10/2026 & 48 · 10/2021--10/2026 & 13 · 07/2024--10/2026 \\
+\entete{Pays} & \entete{Archives} & \entete{Pénuries (en cours)} & \entete{Substances · ATC} & \entete{Période} \\
+France & 116 photos & 2\,764 (187) & 613 · 88,8\,\% & 02/2015--10/2026 \\
+Italie & 54 photos & 13\,651 (2\,171) & 1\,136 · 91,0\,\% & 08/2019--10/2026 \\
+Suède & registre ouvert & 14\,672 (880) & 1\,202 · 91,4\,\% & 02/2018--11/2026 \\
+Tchéquie & déclarations & 16\,235 (1\,239) & 1\,131 · 95,3\,\% & 01/2018--11/2026 \\
+Slovaquie & déclarations & 7\,651 (887) & 922 · 96,4\,\% & 04/2019--11/2026 \\
+Norvège & 6 registres annuels & 6\,413 (424) & 885 · 97,2\,\% & 2019--07/2024 \\
+Allemagne & 13 photos & 2\,000 (549) & 509 · 96,8\,\% & 07/2024--10/2026 \\
 \filet
 \end{tabularx}
-\caption{Description par pays (hors 3\,135 arrêts de commercialisation italiens).}
+\caption{Description par pays (pénuries seules, hors arrêts de commercialisation).}
 \label{tab:pays}
 \end{table}
 
@@ -109,42 +113,40 @@ Photos · période & 59 · 04/2021--10/2026 & 48 · 10/2021--10/2026 & 13 · 07/
 \begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{2.4cm} >{\raggedright\arraybackslash}p{4.5cm} r >{\raggedright\arraybackslash}X}
 \rowcolor{niveaubrut!16}
 \entete{Table} & \entete{Une ligne =} & \entete{Lignes $\times$ col.} & \entete{Variables principales} \\
-Épisodes de pénurie & une pénurie d'un médicament dans un pays & 16\,769 $\times$ 17 &
+Épisodes de pénurie & une pénurie d'un médicament dans un pays (7 pays) & 72\,221 $\times$ 18 &
 \var{atc5} substance (clé commune) ; \var{atc4} classe de substituts ; \var{debut}, \var{fin} ;
 \var{publication} date où elle devient connue ; \var{gravite}, \var{raison} \\
-Signalements & un signalement d'un laboratoire (1\,504 en 2019, 4\,925 en 2023) & 22\,501 $\times$ 9 &
+Signalements & un signalement d'un laboratoire, 2019--2025 & 22\,501 $\times$ 9 &
 \var{date\_signalement}, \var{laboratoire}, \var{atc5} \\
-Médicaments & un médicament de la BDPM (13\,650 commercialisés) & 15\,883 $\times$ 16 & \var{forme}, \var{voies},
+Médicaments & un médicament de la BDPM & 15\,883 $\times$ 16 & \var{forme}, \var{voies},
 \var{titulaires}, \var{atc5} \\
-Consommation & une substance et une année (Open Medic) & 8\,045 $\times$ 5 & \var{boites}, \var{montant\_rembourse} \\
-Panel (niveau 3) & une substance MITM par mois & 99\,063 $\times$ 15 &
-\var{cible} ; Q1 : \var{fr\_autres\_classe\_3m} ; Q2 : \var{it\_affichee\_3m}, \var{de\_affichee\_3m} \\
+Consommation & une substance et un mois (Medic'AM, 2015--06/2026) & 161\,754 $\times$ 6 & \var{boites}, \var{montant\_rembourse} \\
+Panel (niveau 3) & une substance MITM en ville par mois, 04/2020--09/2025 & 58\,410 $\times$ 25 &
+\var{cible}, \var{cible\_nouvelle\_12m} ; Q1, Q2 : signaux sur 3 mois \\
 \filet
 \end{tabularx}
-\caption{Tables principales (22 au niveau 2 + le panel) : une ligne, dimensions, variables.}
+\caption{Tables principales (25 au niveau 2 + le panel) : une ligne, dimensions, variables.}
 \label{tab:dataset}
 \end{table}
 
 \section{Prétraitement et choix}
 
-\textbf{Relier les sources.} L'ANSM et la BDPM ne donnent pas la substance sous forme de code : nous la retrouvons en
-croisant boîte, nom et substance (\textbf{9 lignes sur 10}).
+\textbf{Photos et déclarations en épisodes.} Les photos successives d'un médicament forment un épisode (Italie : présence
+continue, l'AIFA révisant les dates) ; en Tchéquie et en Slovaquie, une interruption déclarée ouvre l'épisode, la reprise le
+ferme. Arrêts définitifs distingués ; archives tronquées écartées.
 
-\textbf{Photos en épisodes.} Les photos successives d'un médicament forment un épisode (Italie : présence continue, l'AIFA révisant
-les dates). Les « N/A » allemands (un quart des lignes) sont traités comme vides ; arrêts définitifs et archives tronquées écartés.
-
-\textbf{Qualité.} Aucun doublon ni boîtes nulles. Fin vide = pénurie en cours (\textbf{11\,\%} en France, \textbf{27\,\%} en Allemagne) ;
-ATC absent (\textbf{3 à 6\,\%}) = hors jointures ; \textbf{46} durées nulles gardées ; aucune imputation.
-
-\textbf{Pas de futur.} Chaque variable n'utilise que ce qui était connu à la fin du mois (\texttt{publication}, non début déclaré) ;
-un contrôle recalcule les variables avec les seules données publiées à une date donnée.
+\textbf{Qualité.} Substance (ATC) retrouvée en croisant boîte, nom et substance (\textbf{9 lignes sur 10}). Aucun doublon d'épisode ni boîtes nulles. Fin vide = pénurie en cours (\textbf{7\,\%} en France, \textbf{27\,\%} en
+Allemagne) ; ATC absent (\textbf{3 à 11\,\%}) = hors jointures ; \textbf{55} durées nulles gardées ; aucune imputation.
+\textbf{Pas de futur} : chaque variable ne lit que ce qui était publié à la fin du mois (contrôlé par recalcul).
 
 \section{Faisabilité et limites}
 
-La cible vaut 1 pour \textbf{24\,\%} des lignes (\textbf{24\,101} positives sur 99\,063) : ni trop rare, ni dominante.
-Part de positifs avec et sans signal sur les 3 mois précédents (écarts bruts) : \textbf{Q2 Italie 53\,\% contre 16\,\%} ;
-Q1 \textbf{31\,\% contre 27\,\%} ; Allemagne 48\,\% contre 25\,\% (13 mois d'archives à ce jour). Ces écarts ne tiennent pas
-compte de la consommation, du nombre de présentations ni de l'historique de chaque substance : l'étape suivante les contrôle.
+La cible vaut 1 pour \textbf{31\,\%} des lignes (\textbf{17\,929} sur 58\,410). Elle est surtout prédite par la
+\textbf{répétition} : le cumul des signalements passés, seul, donne une AUC de \textbf{0,852} (0,861 avec tous les signaux). Nous retenons donc
+une cible plus exigeante : une rupture sur une substance \textbf{sans signalement depuis 12 mois} (9\,\% des 27\,718 lignes
+concernées). Sur cette cible (test 2025), la régression logistique passe de 0,683 à \textbf{0,702} avec les signaux européens
+(Italie surtout ; gain significatif, IC 95\,\% [0,002 ; 0,037]), Q1 n'apporte rien.
 
-\textbf{Limites.} Signalements sans date de fin ; cohorte fondée sur la liste MITM de 2026 (97,5\,\% des signalements) ;
-archives irrégulières ; définition de la pénurie variable selon les pays ; taux de positifs en hausse au fil des années.
+\textbf{Limites.} Peu de nouvelles ruptures distinctes (587 à l'entraînement, 84 au test) ; cohorte fondée sur la liste MITM
+de 2026, substances hospitalières exclues (consommation inconnue) ; taux de positifs en hausse (21\,\% en 2020, 37\,\% en 2023),
+en partie par effet de déclaration ; définition de la pénurie variable selon les pays.

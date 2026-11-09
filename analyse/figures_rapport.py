@@ -78,8 +78,10 @@ def figure_evolution():
         ax.annotate(f"{dernier['n']:,}".replace(",", " "), (dernier["date_photo"], dernier["n"]),
                     xytext=(3, 0), textcoords="offset points", fontsize=7, color=TEXTE, va="center",
                     annotation_clip=False)
-        ax.xaxis.set_major_locator(matplotlib.dates.YearLocator(2))
+        # Depuis l'ancien site de l'ANSM, la frise couvre 2015-2026 : une année sur quatre, sinon les étiquettes se chevauchent.
+        ax.xaxis.set_major_locator(matplotlib.dates.YearLocator(4))
         ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%Y"))
+        ax.tick_params(axis="x", labelsize=7)
     axes[0].set_ylabel("pénuries listées")
     fig.tight_layout(w_pad=2)
     fig.savefig(SORTIE / "evolution_penuries.pdf")
