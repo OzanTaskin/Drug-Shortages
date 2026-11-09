@@ -8,7 +8,8 @@ les méthodes vues en cours.
 |---|---|
 | **README.md** (ce fichier) | le projet en bref, comment lancer le code |
 | [livrables/livrable1/build/Rapport-DALAS-Deliverable1.pdf](livrables/livrable1/build/Rapport-DALAS-Deliverable1.pdf) | **le rapport du livrable 1** (2 pages) : questions, collecte, description quantitative, prétraitement |
-| [livrables/livrable2/Plan-DALAS-Deliverable2.pdf](livrables/livrable2/Plan-DALAS-Deliverable2.pdf) | le plan du livrable 2 (dashboard) |
+| [dashboard/README.md](dashboard/README.md) | **le dashboard du livrable 2** : lancement en trois commandes, les sept vues |
+| [livrables/livrable2/Plan-DALAS-Deliverable2.pdf](livrables/livrable2/Plan-DALAS-Deliverable2.pdf) | le plan du livrable 2 (rédigé avant l'ajout de 4 pays) |
 | [dataset/EXPLICATIONS.md](dataset/EXPLICATIONS.md) | **l'explication détaillée** : chaque source, chaque table, chaque choix, et pourquoi, au regard des cours ; la suite du projet |
 | [dataset/CHANGELOG_DATA.md](dataset/CHANGELOG_DATA.md) | une ligne par changement des données : date, auteur, quoi, pourquoi |
 | `dataset/manifestes/` | l'état exact des tables à chaque construction de référence (lignes, sommes, empreintes) |
@@ -33,7 +34,7 @@ qui ne sont jamais en pénurie. L'Italie, l'Allemagne, la Norvège, la Suède, l
 | Livrable 1 : rapport de 2 pages | ✅ `livrables/livrable1/` |
 | Consommation mensuelle (Medic'AM) | ✅ `consommation_mensuelle` : 1 560 substances × 138 mois (01/2015 à 06/2026) ; 3 variables dans `panel_fr` |
 | Niveau 3 : table d'entraînement `panel_fr` | ✅ **complète, sans valeur vide** : 58 410 lignes × 25 colonnes (885 substances délivrées en ville × 66 mois, 04/2020 à 09/2025), cible (et cible des nouvelles pénuries, sur les substances calmes depuis 6 ou 12 mois), 17 variables et 2 indicateurs de couverture (Italie, Norvège), découpage temporel ; contrôles anti-fuite (recalcul, perturbation) ; voir [dataset/EXPLICATIONS.md](dataset/EXPLICATIONS.md), section 6 |
-| TME6 : dashboard | ⏳ plan dans `livrables/livrable2/` |
+| Livrable 2 : dashboard | ✅ `dashboard/` : application Dash, 7 vues, lancée par `python dashboard/app.py` sans les données brutes |
 | TME9 : rapport final | ⏳ |
 
 ## Lancer le code
@@ -54,6 +55,7 @@ cd dataset
 ../.venv/bin/python -m analyse.faisabilite    # faisabilité chiffrée sur panel_fr : cible, Q1 et Q2, bruts puis contrôlés
 ```
 
+- **Dashboard (livrable 2)** : depuis la racine, `.venv/bin/python dashboard/app.py`, puis http://127.0.0.1:8050. Il n'a pas besoin de `dataset/data/` (voir [dashboard/README.md](dashboard/README.md)).
 - Étapes isolées : `python -m collecte actuelles wayback`, `python -m nettoyage controles`.
 - La collecte peut être relancée : les fichiers déjà présents ne sont pas retéléchargés. Si un
   téléchargement échoue, elle s'arrête avec la liste des fichiers manquants.

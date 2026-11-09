@@ -19,3 +19,6 @@ __pycache__/
 
 # Documents personnels (non publiés sur GitHub)
 personnel/
+
+# Réglages locaux de Claude Code
+.claude/
