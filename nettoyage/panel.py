@@ -20,6 +20,15 @@ Panel COMPLET : aucune valeur vide. Les choix qui l'assurent (décidés avec les
 Cible `cible` : 1 si au moins un signalement de rupture est déclaré à l'ANSM pour la substance
 entre t+1 et t+3.
 
+Cible des NOUVELLES pénuries (la cible qui compte : `cible` est surtout prédite par la répétition, 97 % de ses
+cas positifs en 2025 concernent une substance déjà signalée) :
+- `calme_6m`, `calme_12m` : 1 si la substance n'a eu AUCUN signalement de t-5 à t (6 mois) ou de t-11 à t (12 mois) ;
+- `cible_nouvelle_6m`, `cible_nouvelle_12m` : `cible` ET `calme_*` : une rupture qui arrive sur une substance calme.
+On évalue la cible nouvelle sur les seules lignes calmes. ATTENTION : `calme_*` et `cible_nouvelle_*` lisent les
+vraies dates des signalements (pas encore publiés à t) : ce sont des définitions de cible et de sous-population,
+JAMAIS des variables d'entrée d'un modèle. Pas de seuil à 24 mois : les signalements commencent en 01/2019, les
+24 mois précédents ne seraient pas couverts avant t = 01/2021.
+
 Règle de temps : une variable d'une ligne (substance, t) n'utilise que ce qui était PUBLIÉ à la fin
 du mois t. Un épisode de pénurie compte comme affiché de sa `publication` jusqu'à `fin_connue_le`
 (date où l'on a vu qu'il avait disparu), jamais jusqu'à sa `fin` réelle, connue plus tard.
@@ -54,6 +63,7 @@ DEBUT = int((PREMIER_T - MOIS[0]).n)
 REGISTRES = ("NO", "SE", "CZ", "SK")  # registres avec date de publication : signal = nouvelle déclaration sur 3 mois
 # Couverture des signaux européens : (premier t couvert, dernier t couvert), bornes comprises.
 COUVERTURE = {"it": (pd.Period("2021-12", "M"), None), "no": (None, pd.Period("2024-06", "M"))}
+CALME = (6, 12)  # mois sans signalement qui font une substance « calme »
 DECOUPAGE = [("entrainement", "2020-04", "2023-09"), ("ecart", "2023-10", "2023-12"),
              ("validation", "2024-01", "2024-09"), ("ecart", "2024-10", "2024-12"), ("test", "2025-01", "2025-09")]
 
@@ -206,6 +216,16 @@ def construire():
 
     table = pd.DataFrame({"atc5": np.repeat(avec, nT), "mois": np.tile(mois.to_timestamp(), len(avec)),
                           "cible": cible.ravel().astype("int8")})
+    # Substances calmes (aucun signalement sur les k derniers mois, t compris) et cible des nouvelles pénuries.
+    for k in CALME:
+        if DEBUT - k + 1 < 0:
+            raise SystemExit(f"calme_{k}m : les {k} mois avant {PREMIER_T} ne sont pas couverts par les signalements")
+        recent = np.zeros((len(tout), nT), dtype=bool)
+        for decalage in range(k):
+            recent |= S[:, DEBUT - decalage:T - decalage]
+        calme = (~recent)[lignes].ravel()
+        table[f"calme_{k}m"] = calme.astype("int8")
+        table[f"cible_nouvelle_{k}m"] = (table["cible"].to_numpy().astype(bool) & calme).astype("int8")
     table["annee"] = table["mois"].dt.year.astype("int16")
     table["mois_num"] = table["mois"].dt.month.astype("int8")
     table["jeu"] = pd.Series("ecart", index=table.index)
@@ -279,6 +299,17 @@ def controler(table, avec, evenements, tout, C, presentes, mois_c):
                  and (dernier is None or mois_couverts.max() <= dernier.to_timestamp()), "bornes non respectées")
     verifier("dernière année de signalements lue ≥ 2019 (première publiée)",
              derniere_annee_publiee(table["annee"].to_numpy(), table["mois_num"].to_numpy()).min() >= 2019, "année absente lue")
+    for k in CALME:
+        nouvelle, calme = table[f"cible_nouvelle_{k}m"], table[f"calme_{k}m"]
+        verifier(f"cible_nouvelle_{k}m = cible sur les lignes calmes, 0 ailleurs",
+                 (nouvelle == table["cible"] * calme).all(), "écart")
+    # Recalcul indépendant de calme_12m sur un échantillon, à partir des dates des signalements.
+    sig = lire("ansm_signalements").dropna(subset=["atc5"])
+    mois_sig = sig.assign(m=sig["date_signalement"].dt.to_period("M")).groupby("atc5")["m"].apply(set)
+    echantillon = table.sample(2000, random_state=2)
+    attendu = [int(not any((t.to_period("M") - j) in mois_sig.get(a, set()) for j in range(12)))
+               for a, t in zip(echantillon["atc5"], echantillon["mois"])]
+    verifier("calme_12m = aucun signalement de t-11 à t (recalcul)", list(echantillon["calme_12m"]) == attendu, "écart")
     taux = table["cible"].mean()
     verifier("taux de cas positifs plausible (15 % à 40 %)", 0.15 < taux < 0.40, f"{taux:.3f}")
     for avant, apres in [("entrainement", "validation"), ("validation", "test")]:

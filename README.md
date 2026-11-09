@@ -31,7 +31,7 @@ qui ne sont jamais en pénurie. L'Italie, l'Allemagne, la Norvège, la Suède, l
 | Niveau 2 : tables nettoyées | ✅ 25 tables, dont `shortage_events` (72 221 épisodes FR/IT/DE/NO/SE/CZ/SK) et `ansm_signalements` (22 501 signalements 2019-2025) ; contrôles automatiques |
 | Livrable 1 : rapport de 2 pages | ✅ `Rapport-DALAS-Deliverable1/` |
 | Consommation mensuelle (Medic'AM) | ✅ `consommation_mensuelle` : 1 560 substances × 138 mois (01/2015 à 06/2026) ; 3 variables dans `panel_fr` |
-| Niveau 3 : table d'entraînement `panel_fr` | ✅ **complète, sans valeur vide** : 58 410 lignes (885 substances délivrées en ville × 66 mois, 04/2020 à 09/2025), cible, 17 variables et 2 indicateurs de couverture (Italie, Norvège), découpage temporel ; contrôles anti-fuite (recalcul, perturbation) ; voir [EXPLICATIONS.md](EXPLICATIONS.md), section 6 |
+| Niveau 3 : table d'entraînement `panel_fr` | ✅ **complète, sans valeur vide** : 58 410 lignes × 25 colonnes (885 substances délivrées en ville × 66 mois, 04/2020 à 09/2025), cible (et cible des nouvelles pénuries, sur les substances calmes depuis 6 ou 12 mois), 17 variables et 2 indicateurs de couverture (Italie, Norvège), découpage temporel ; contrôles anti-fuite (recalcul, perturbation) ; voir [EXPLICATIONS.md](EXPLICATIONS.md), section 6 |
 | TME6 : dashboard | ⏳ |
 | TME9 : rapport final | ⏳ |
 

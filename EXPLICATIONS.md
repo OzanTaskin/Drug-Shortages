@@ -368,6 +368,15 @@ virgule flottante, précision des dates selon la version de pandas) a été corr
 
 ## 6. La table d'entraînement (niveau 3, construite) et la suite
 
+> **Mise à jour du 09/11/2026 (3) : la cible des nouvelles pénuries.** La cible `cible` est trop facile : 97 % de ses
+> cas positifs de 2025 concernent une substance déjà signalée, et le cumul des signalements passés, seul, donne une AUC
+> de 0,852 (0,856 pour tout le modèle). Le panel ajoute donc `calme_12m` (aucun signalement de t-11 à t) et
+> `cible_nouvelle_12m` (rupture dans les 3 mois sur une substance calme), et leurs versions à 6 mois. Ces colonnes lisent
+> les vraies dates des signalements : ce sont des définitions de cible et de sous-population, jamais des variables.
+> Sur les lignes calmes (27 718, dont 9,1 % positives), test 2025 : AUC 0,683 sans signal européen, 0,702 avec
+> (Italie surtout ; gain +0,019, IC 95 % [0,002 ; 0,037] par rééchantillonnage des substances). Limite : une rupture
+> donne jusqu'à 3 lignes positives ; il n'y a que 587 nouvelles ruptures distinctes à l'entraînement et 84 au test.
+>
 > **Mise à jour du 09/11/2026 (2) : panel étendu.** Avec l'ancien site de l'ANSM, la France est couverte depuis 2015 :
 > le panel commence en **04/2020** (premier mois où la dernière année de signalements publiée, 2019, existe) et compte
 > **58 410 lignes** (885 substances × 66 mois), toujours sans valeur vide. L'Italie (t ≥ 12/2021) et la Norvège

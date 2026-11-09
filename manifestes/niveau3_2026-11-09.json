@@ -1,11 +1,15 @@
 {
  "panel_fr": {
-  "construite_le": "2026-11-09T14:32:49",
+  "construite_le": "2026-11-09T14:49:04",
   "lignes": 58410,
   "colonnes": [
    "atc5",
    "mois",
    "cible",
+   "calme_6m",
+   "cible_nouvelle_6m",
+   "calme_12m",
+   "cible_nouvelle_12m",
    "annee",
    "mois_num",
    "jeu",
@@ -28,6 +32,10 @@
   "valeurs_vides": 0,
   "sommes": {
    "cible": 17929.0,
+   "calme_6m": 34370.0,
+   "cible_nouvelle_6m": 4071.0,
+   "calme_12m": 27718.0,
+   "cible_nouvelle_12m": 2529.0,
    "annee": 118134225.0,
    "mois_num": 379665.0,
    "fr_affichee_3m": 7136.0,
@@ -46,9 +54,9 @@
    "conso_saison_cible": 60668.93,
    "ue_critique": 3380.0
   },
-  "empreinte_contenu": "bac81ea297e17012",
-  "commit": "abbf18b+modifs",
-  "empreinte_code": "e99e4a00436e7e77",
+  "empreinte_contenu": "8574a072e4dbd9e8",
+  "commit": "e40dd46+modifs",
+  "empreinte_code": "26ff32122d5fe7a6",
   "empreinte_brut": "131812ae7eb3cbfe"
  }
 }

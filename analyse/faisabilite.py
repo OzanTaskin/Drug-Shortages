@@ -84,6 +84,48 @@ def facteurs():
             "Q2 Norvège avec (validation 01-06/2024)": auc(norvege, base + ["no_nouvelle_3m", "no_couvert"], "validation")}
 
 
+def nouvelles_penuries(k=12):
+    """La question difficile : sur les seules substances calmes (aucun signalement depuis k mois), quels signaux
+    annoncent une rupture ? Taux de base, puis apport de chaque signal (régression logistique, entraînement →
+    test 2025 ; PR-AUC à comparer au taux de base, AUC à 0,5)."""
+    import numpy as np
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import average_precision_score, roc_auc_score
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    t = pd.read_parquet(PANEL)
+    t = t[(t[f"calme_{k}m"] == 1) & (t["jeu"].isin(["entrainement", "test"]))].copy()
+    cible = f"cible_nouvelle_{k}m"
+    for entree, sortie in [("conso_6m_pub", "conso"), ("sig_annee_pub", "sig"), ("sig_cumul_pub", "sig_cumul")]:
+        t[sortie] = np.log1p(t[entree].astype("float64"))
+    t["tendance"], t["saison"] = np.log(t["conso_tendance_6m"].astype("float64")), np.log(t["conso_saison_cible"].astype("float64"))
+    europe = ["it_affichee_3m", "it_couvert", "se_nouvelle_3m", "cz_nouvelle_3m", "sk_nouvelle_3m"]
+    for c in europe + ["fr_affichee_3m", "fr_autres_classe_3m"]:
+        t[c] = t[c].astype("float64")
+    base = ["conso", "tendance", "saison", "ue_critique", "sig", "sig_cumul", "fr_affichee_3m"]
+    entrainement, test = t[t["jeu"] == "entrainement"], t[t["jeu"] == "test"]
+
+    def evaluer(colonnes):
+        modele = make_pipeline(StandardScaler(), LogisticRegression(max_iter=2000)).fit(entrainement[colonnes], entrainement[cible])
+        prob = modele.predict_proba(test[colonnes])[:, 1]
+        return float(roc_auc_score(test[cible], prob)), float(average_precision_score(test[cible], prob))
+
+    resultat = {"lignes_test": len(test), "positives_test": int(test[cible].sum()), "taux_test": float(test[cible].mean()),
+                "modeles": {"base": evaluer(base), "base + Q1 (classe)": evaluer(base + ["fr_autres_classe_3m"]),
+                            "base + Italie": evaluer(base + ["it_affichee_3m", "it_couvert"]),
+                            "base + Suède": evaluer(base + ["se_nouvelle_3m"]),
+                            "base + Tchéquie": evaluer(base + ["cz_nouvelle_3m"]),
+                            "base + Slovaquie": evaluer(base + ["sk_nouvelle_3m"]),
+                            "base + tous les pays": evaluer(base + europe),
+                            "base + tous les pays + Q1": evaluer(base + europe + ["fr_autres_classe_3m"])},
+                "seuls": {}}
+    for c in ["sig_cumul", "conso", "fr_affichee_3m", "fr_autres_classe_3m"] + europe[:1] + europe[2:]:
+        if test[c].nunique() > 1:
+            resultat["seuls"][c] = float(roc_auc_score(test[cible], test[c]))
+    return resultat
+
+
 def pct(x):
     return f"{100 * x:.1f} %"
 
@@ -100,6 +142,12 @@ def main():
     print("\nSignaux contrôlés (régression logistique, test 2025 sauf mention) :")
     for nom, d in facteurs().items():
         print(f"  {nom:40} AUC {d['auc']:.3f}  PR-AUC {d['pr_auc']:.3f}")
+    n = nouvelles_penuries(12)
+    print(f"\nNouvelles pénuries (substances sans signalement depuis 12 mois), test 2025 : {n['lignes_test']} lignes, "
+          f"{n['positives_test']} positives, taux de base {pct(n['taux_test'])} (= PR-AUC du hasard)")
+    for nom, (a, pr) in n["modeles"].items():
+        print(f"  {nom:28} AUC {a:.3f}  PR-AUC {pr:.3f}")
+    print("  variables seules (AUC) : " + ", ".join(f"{c} {v:.3f}" for c, v in n["seuls"].items()))
 
 
 if __name__ == "__main__":
