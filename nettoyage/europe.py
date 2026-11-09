@@ -1,4 +1,4 @@
-"""Italie (AIFA) et Allemagne (BfArM) → `europe_observations` et `europe_episodes`.
+"""Italie (AIFA), Allemagne (BfArM) et Norvège (DMP) → `europe_observations` et `europe_episodes`.
 
 Ces listes servent de signaux européens (question 2). Chaque photo (archives Wayback + photo du
 jour) donne les pénuries publiées à cette date.
@@ -26,6 +26,21 @@ fin 2024 : pour les photos plus anciennes, on reprend l'ATC connu du même code 
 celui de la même substance.
 Les arrêts définitifs de commercialisation (Italie) ne sont pas des pénuries :
 `type_episode` = « arret_definitif ».
+
+Norvège : pas de photos successives d'une liste, mais un registre annuel (2019 à 07/2024) qui garde
+chaque pénurie déclarée, avec sa date de déclaration (`date_declaration`, Meldingsdato), sa période
+(début, fin prévue ou constatée), sa cause et son statut à la date du classeur (31/12, 12/07/2024 pour
+le dernier). `date_photo` = cette date de statut. Épisode : un numéro de boîte (Varenummer) et une date
+de déclaration ; un même épisode est repris d'un classeur à l'autre tant qu'il est en cours.
+- `publication` = date de déclaration : la DMP publie la pénurie à sa déclaration (hypothèse : sans délai) ;
+- `fin` = fin de la période déclarée, dans le dernier classeur où l'épisode figure, quand le statut y est
+  « Tilgjengelig » (disponible) ; à défaut de date lisible, la date du classeur ;
+- `fin_au_plus_tard` (devient `fin_connue_le`) = date du premier classeur où l'épisode est terminé : on
+  ne sait qu'il est fini qu'à cette date, au plus tard ;
+- en cours au dernier classeur (12/07/2024) : `en_cours`, sans fin (la source s'arrête là) ;
+- médicaments vétérinaires écartés (ATC en Q, ou « Legemiddel til dyr ») ; retraits du marché
+  (cause « avregistrering ») : `type_episode` = « arret_definitif » ;
+- ATC absent du classeur 2019 : repris du même numéro de boîte, sinon de la même substance.
 """
 import io
 import re
@@ -42,9 +57,23 @@ def atc5_valide(code):
     return code if ATC5_VALIDE.match(code) else None
 
 
+TRONQUE = 1024 * 1024  # la Wayback Machine coupe certaines archives à 1 Mio pile : photo incomplète
+
+
 def photos(dossier_wayback, dossier_actuel):
-    return (sorted((RAW / "wayback" / dossier_wayback).glob("2*.csv"))
-            + sorted((RAW / dossier_actuel / "actuel").glob("*.csv")))
+    chemins = (sorted((RAW / "wayback" / dossier_wayback).glob("2*.csv"))
+               + sorted((RAW / dossier_actuel / "actuel").glob("*.csv")))
+    tronques = [c for c in chemins if c.stat().st_size == TRONQUE]
+    if tronques:
+        print(f"  {dossier_wayback} : {len(tronques)} archive(s) tronquée(s) à 1 Mio écartée(s) : "
+              + ", ".join(c.name for c in tronques))
+    return [c for c in chemins if c.stat().st_size != TRONQUE]
+
+
+# En-têtes des listes AIFA de 2019-2020 (majuscules, autres noms) → en-têtes actuels.
+ENTETES_AIFA_ANCIENS = {"NOME COMMERCIALE": "Nome medicinale", "AIC": "Codice AIC",
+                        "PRINCIPIO ATTIVO": "Principio attivo", "DATA INIZIO": "Data inizio",
+                        "DATA DI FINE PRESUNTA": "Fine presunta", "MOTIVAZIONI": "Motivazioni"}
 
 
 def lire_aifa(chemin):
@@ -52,6 +81,8 @@ def lire_aifa(chemin):
     texte = chemin.read_bytes().decode("cp1252", errors="replace")
     # Deux lignes d'avertissement avant l'en-tête.
     table = pd.read_csv(io.StringIO(texte), sep=";", skiprows=2, dtype=str, keep_default_na=False)
+    table.columns = [re.sub(r"\s+", " ", c).strip() for c in table.columns]
+    table = table.rename(columns=ENTETES_AIFA_ANCIENS)
     table = table[table["Codice AIC"].str.strip() != ""]
     return pd.DataFrame({
         "pays": "IT",
@@ -89,6 +120,93 @@ def lire_bfarm(chemin):
     })
 
 
+COLONNES_DMP = {  # début du nom de colonne → nom dans la table
+    "Meldingsdato": "date_declaration", "ATC": "atc5", "Legemiddelnavn": "medicament",
+    "Varenummer": "code_produit", "Virkestoff": "substance", "Årsak": "raison",
+    "Mangelperiode fra": "debut", "Mangelperiode til": "fin_prevue", "Status pr": "statut",
+    "Type legemiddel": "type_legemiddel",
+}
+
+
+def date_dmp(valeurs):
+    """Dates du registre : cellules Excel (dates) ou textes « jj.mm.aaaa » ; le reste (« Uke 22 ») est vide."""
+    texte = valeurs.astype(str).str.strip().str[:19]
+    iso = pd.to_datetime(texte, format="%Y-%m-%d %H:%M:%S", errors="coerce")
+    return iso.fillna(pd.to_datetime(texte.str[:10], format="%d.%m.%Y", errors="coerce"))
+
+
+def lire_dmp(chemin):
+    brut = pd.read_excel(chemin, sheet_name=0, header=None, dtype=str)
+    entete = next(i for i in range(20) if (brut.iloc[i].astype(str).str.strip() == "Meldingsdato").any())
+    noms = [str(c).strip() for c in brut.iloc[entete]]
+    table = brut.iloc[entete + 1:].set_axis(noms, axis=1)
+    colonnes = {}
+    for nom in noms:
+        for debut, cible in COLONNES_DMP.items():
+            if nom.startswith(debut) and cible not in colonnes.values():
+                colonnes[nom] = cible
+    statut = next(nom for nom in noms if nom.startswith("Status pr"))
+    date_statut = pd.to_datetime(re.search(r"(\d{2}\.\d{2}\.\d{4})", statut).group(1), format="%d.%m.%Y")
+    table = table.rename(columns=colonnes)[list(colonnes.values())]
+    table = table[table["date_declaration"].notna() & table["code_produit"].notna()]
+    texte = lambda c: table[c].fillna("").astype(str).str.strip() if c in table else pd.Series("", index=table.index)
+    humain = ~texte("atc5").str.upper().str.startswith("Q") & ~texte("type_legemiddel").str.contains("dyr")
+    table = table[humain]
+    declaration = date_dmp(table["date_declaration"])
+    # Faute de saisie (« 21.11.2109 ») : une déclaration postérieure au classeur est impossible ; on prend
+    # alors le début de la pénurie, s'il est lui-même antérieur au classeur.
+    debut = date_dmp(table["debut"])
+    impossible = declaration > date_statut
+    declaration = declaration.where(~impossible, debut.where(debut <= date_statut))
+    code = texte("code_produit").str.replace(r"\.0$", "", regex=True).str.zfill(6)
+    return pd.DataFrame({
+        "pays": "NO",
+        "date_photo": date_statut,
+        "id_episode": code + "_" + declaration.dt.strftime("%Y%m%d"),
+        "code_produit": code,
+        "medicament": texte("medicament"),
+        "substance": texte("substance").str.lower(),
+        "atc5": texte("atc5").map(atc5_valide),
+        "debut": debut,
+        "fin_prevue": date_dmp(table["fin_prevue"]),
+        "raison": texte("raison").replace("", None),
+        "criticite": None,
+        "date_declaration": declaration,
+        "statut": texte("statut").replace("", None),
+    }).dropna(subset=["date_declaration"])
+
+
+def episodes_norvegiens(observations):
+    """Un épisode par (numéro de boîte, date de déclaration), à partir des classeurs annuels."""
+    no = observations[observations["pays"] == "NO"].sort_values("date_photo")
+    derniere = no["date_photo"].max()
+    termine = no["statut"].fillna("").str.contains("Tilgjengelig")
+    premiere_fin_vue = no[termine].groupby("id_episode")["date_photo"].min()
+    episodes = (no.groupby("id_episode")
+                .agg(pays=("pays", "first"), medicament=("medicament", "last"), substance=("substance", "last"),
+                     atc5=("atc5", lambda s: s.dropna().mode().iloc[0] if s.notna().any() else None),
+                     nb_produits=("code_produit", "nunique"),
+                     debut=("debut", lambda s: s.dropna().iloc[-1] if s.notna().any() else pd.NaT),
+                     debut_declare_initial=("debut", lambda s: s.dropna().iloc[0] if s.notna().any() else pd.NaT),
+                     fin_prevue=("fin_prevue", "last"), premiere_photo=("date_photo", "min"),
+                     derniere_photo=("date_photo", "max"), raison=("raison", "last"), criticite=("criticite", "last"),
+                     publication=("date_declaration", "min"), statut=("statut", "last"))
+                .reset_index())
+    episodes["fin_au_plus_tard"] = episodes["id_episode"].map(premiere_fin_vue)
+    fini = episodes["fin_au_plus_tard"].notna()
+    episodes["en_cours"] = ~fini & (episodes["derniere_photo"] == derniere)
+    # Disparu du registre sans statut « disponible » : terminé au plus tard au classeur suivant.
+    disparu = ~fini & ~episodes["en_cours"]
+    dates = sorted(no["date_photo"].unique())
+    suivante = {d: s for d, s in zip(dates, dates[1:])}
+    episodes.loc[disparu, "fin_au_plus_tard"] = episodes.loc[disparu, "derniere_photo"].map(suivante)
+    fin = episodes["fin_prevue"].where(episodes["fin_prevue"] <= episodes["fin_au_plus_tard"])
+    episodes["fin"] = fin.fillna(episodes["fin_au_plus_tard"]).where(~episodes["en_cours"])
+    arret = episodes["raison"].fillna("").str.lower().str.contains("avregistr")
+    episodes["type_episode"] = arret.map({True: "arret_definitif", False: "penurie"})
+    return episodes.drop(columns="statut")
+
+
 def episodes_italiens(observations):
     """Identifiant d'épisode italien : AIC + mois de la première photo d'une présence continue.
 
@@ -123,7 +241,8 @@ def episodes_italiens(observations):
 def construire():
     observations = pd.concat(
         [lire_aifa(c) for c in photos("aifa_carenti", "aifa")]
-        + [lire_bfarm(c) for c in photos("bfarm_lieferengpaesse", "bfarm")], ignore_index=True)
+        + [lire_bfarm(c) for c in photos("bfarm_lieferengpaesse", "bfarm")]
+        + [lire_dmp(c) for c in sorted((RAW / "dmp").glob("legemiddelmangel_*.xls*"))], ignore_index=True)
 
     # Italie : ATC repris du même code AIC quand la photo n'a pas encore la colonne ATC.
     atc_par_produit = (observations.dropna(subset=["atc5"]).sort_values("date_photo")
@@ -141,6 +260,8 @@ def construire():
     observations = episodes_italiens(observations.drop_duplicates())
     enregistrer(observations, "europe_observations")
 
+    norvege = episodes_norvegiens(observations)
+    observations = observations[observations["pays"] != "NO"]  # Italie, Allemagne : listes en photos
     derniere_photo = observations.groupby("pays")["date_photo"].max()
     episodes = (observations.sort_values("date_photo").groupby(["pays", "id_episode"])
                 .agg(medicament=("medicament", "last"), substance=("substance", "last"),
@@ -167,6 +288,7 @@ def construire():
     episodes["fin_au_plus_tard"] = [photo_suivante.get((pays, fin)) if pd.notna(fin) else pd.NaT
                                     for pays, fin in zip(episodes["pays"], episodes["fin"])]
     episodes["fin_au_plus_tard"] = pd.to_datetime(episodes["fin_au_plus_tard"])
+    episodes = pd.concat([episodes, norvege[episodes.columns]], ignore_index=True)
     enregistrer(episodes, "europe_episodes")
     for pays, groupe in episodes.groupby("pays"):
         print(f"  {pays} : {len(groupe)} épisodes, ATC5 connu pour {groupe['atc5'].notna().mean():.0%}")

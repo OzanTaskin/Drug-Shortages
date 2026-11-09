@@ -1,5 +1,5 @@
 """`shortage_events` : la table centrale du niveau 2. Une ligne = un épisode de pénurie,
-dans un pays, au même format pour la France, l'Italie et l'Allemagne.
+dans un pays, au même format pour la France, l'Italie, l'Allemagne et la Norvège.
 
 Colonnes communes :
     pays, id_episode, medicament, substance, atc5, atc4, debut, fin, en_cours,
@@ -9,9 +9,14 @@ Colonnes communes :
     pour les variables de prédiction),
     censure_gauche (déjà publié dans la première photo du pays : début réel inconnu, à exclure des
     durées et des comptes de nouvelles pénuries),
+    censure_droite (France : épisode encore en cours au passage de l'ancien au nouveau site de l'ANSM,
+    en 04/2021 ; sa `fin` est la dernière photo de l'ancien site, sa vraie fin est inconnue : à exclure des
+    durées, comme `en_cours`),
     fin_connue_le (photo où l'on voit que l'épisode est terminé : `fin` ne peut servir à une date d
     que si fin_connue_le < d, voir `ansm_episodes.py`)
-La France vient de `ansm_episodes`, l'Italie et l'Allemagne de `europe_episodes`.
+La France vient de `ansm_episodes`, l'Italie, l'Allemagne et la Norvège de `europe_episodes`.
+Norvège : registre et non photos ; un épisode n'est censuré à gauche que s'il a été déclaré avant 2019
+(premier classeur collecté).
 
 Types : les colonnes à peu de valeurs distinctes sont en dtype `category` (une valeur stockée une
 fois, un petit code par ligne) ; la gravité est une catégorie ordonnée.
@@ -23,8 +28,9 @@ from .commun import CLEAN, enregistrer
 
 COLONNES = ["pays", "id_episode", "medicament", "substance", "atc5", "atc4", "debut", "fin",
             "en_cours", "type_episode", "gravite", "criticite", "raison", "debut_connu", "publication",
-            "censure_gauche", "fin_connue_le"]
+            "censure_gauche", "censure_droite", "fin_connue_le"]
 DATES = ["debut", "fin", "publication", "fin_connue_le"]
+DEBUT_REGISTRE_NORVEGIEN = pd.Timestamp("2019-01-01")
 CATEGORIES = {"pays": None, "type_episode": None, "criticite": None,
               "gravite": pd.CategoricalDtype(list(GRAVITE), ordered=True)}
 
@@ -40,11 +46,14 @@ def construire():
         debut_connu=france["debut"].notna(),
         debut=france["debut"].fillna(france["debut_au_plus_tot"]),
         type_episode="penurie", gravite=france["gravite_max"], criticite=None, raison=None,
-        publication=france["premiere_photo"])
+        publication=france["premiere_photo"],
+        censure_droite=france["type_fin"] == "changement_de_site")
     premiere_photo_du_pays = europe.groupby("pays")["premiere_photo"].transform("min")
-    europe = europe.assign(gravite=None, debut_connu=True,
+    europe = europe.assign(gravite=None, debut_connu=True, censure_droite=False,
                            censure_gauche=europe["premiere_photo"] == premiere_photo_du_pays,
                            fin_connue_le=europe["fin_au_plus_tard"])
+    norvege = europe["pays"] == "NO"
+    europe.loc[norvege, "censure_gauche"] = europe.loc[norvege, "publication"] < DEBUT_REGISTRE_NORVEGIEN
 
     evenements = pd.concat([france, europe], ignore_index=True)
     evenements["atc4"] = evenements["atc5"].str[:5]

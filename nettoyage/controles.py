@@ -86,13 +86,20 @@ def controler_reconciliation():
            f"{signalements['atc5'].notna().sum()} signalements, {dans_le_panel} dans le panel")
 
     evenements = lire("shortage_events")
-    for source, pays in (("ansm_episodes", ["FR"]), ("europe_episodes", ["IT", "DE"])):
+    for source, pays in (("ansm_episodes", ["FR"]), ("europe_episodes", ["IT", "DE", "NO"])):
         attendu, obtenu = len(lire(source)), evenements["pays"].isin(pays).sum()
         yield f"{source} → shortage_events sans perte", attendu == obtenu, f"{attendu} épisodes, {obtenu} gardés"
 
-    for table, seuil in (("ansm_signalements", 0.05), ("ansm_fiches", 0.10), ("shortage_events", 0.10)):
+    for table, seuil in (("ansm_signalements", 0.05), ("shortage_events", 0.10)):
         part = lire(table)["atc5"].isna().mean()
         yield f"part sans ATC5 dans {table} : {part:.1%} (seuil {seuil:.0%})", part <= seuil, f"{part:.1%}"
+    # Fiches ANSM : l'ancien site (2015-2021) cite surtout des médicaments retirés depuis, souvent
+    # hospitaliers (absents d'Open Medic) : seuil plus large, mesuré à part.
+    fiches = lire("ansm_fiches")
+    ancien = fiches["fiche"].str.startswith("ancien:")
+    for nom, masque, seuil in (("site actuel", ~ancien, 0.10), ("ancien site", ancien, 0.25)):
+        part = fiches.loc[masque, "atc5"].isna().mean()
+        yield f"part sans ATC5 dans ansm_fiches, {nom} : {part:.1%} (seuil {seuil:.0%})", part <= seuil, f"{part:.1%}"
 
 
 def controler_medicam():

@@ -23,7 +23,8 @@ def lire(nom):
 
 def durees_france(episodes):
     """Durée (en jours) des pénuries françaises terminées, dont le début est connu et pas censuré à gauche."""
-    termines = episodes[(~episodes["en_cours"]) & (~episodes["censure_gauche"]) & episodes["debut_connu"]]
+    termines = episodes[(~episodes["en_cours"]) & (~episodes["censure_gauche"]) & (~episodes["censure_droite"])
+                        & episodes["debut_connu"]]
     jours = (termines["fin"] - termines["debut"]).dt.days
     return jours[jours >= 0]
 
@@ -35,7 +36,8 @@ def calculer():
     penuries = evenements[evenements["type_episode"] == "penurie"]
     europe = lire("europe_observations")
     photos = {"FR": lire("ansm_observations")["date_photo"],
-              "IT": europe[europe["pays"] == "IT"]["date_photo"], "DE": europe[europe["pays"] == "DE"]["date_photo"]}
+              "IT": europe[europe["pays"] == "IT"]["date_photo"], "DE": europe[europe["pays"] == "DE"]["date_photo"],
+              "NO": europe[europe["pays"] == "NO"]["date_photo"]}  # Norvège : un classeur annuel par « photo »
     resultat["pays"] = {}
     for pays, g in penuries.groupby("pays", observed=True):
         p = photos[pays]

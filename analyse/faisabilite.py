@@ -7,8 +7,9 @@ Usage :
 Trois questions avant toute modélisation :
 - la cible est-elle observable, avec assez de cas positifs, et comment évolue-t-elle ? ;
 - Q1 (cascade) : combien de lignes sont exposées à une pénurie affichée dans la même classe ATC4 ? ;
-- Q2 (importation) : combien de lignes sont exposées à une pénurie affichée en Italie ? (l'Allemagne n'a que 13 mois
-  d'archives : hors du panel complet)
+- Q2 (importation) : combien de lignes sont exposées à une pénurie affichée en Italie, ou à une nouvelle déclaration
+  en Norvège ? Chaque signal n'est compté que sur les mois couverts par sa source (`it_couvert`, `no_couvert`).
+  (L'Allemagne n'a que 13 mois d'archives : hors du panel complet.)
 Les taux avec et sans exposition sont des repères bruts, pas des résultats : ils ne tiennent pas compte
 de la taille des classes, de la consommation ni de la hausse générale des signalements.
 """
@@ -18,10 +19,11 @@ import pandas as pd
 
 PANEL = Path(__file__).resolve().parent.parent / "data" / "final" / "panel_fr.parquet"
 
-EXPOSITIONS = {  # nom : (colonne, exposée si)
-    "Q1 cascade : autres substances de la classe affichées": ("fr_autres_classe_3m", lambda x: x > 0),
-    "Q2 Italie : même substance affichée": ("it_affichee_3m", lambda x: x > 0),
-    "Contrôle : même substance affichée en France": ("fr_affichee_3m", lambda x: x > 0),
+EXPOSITIONS = {  # nom : (colonne, exposée si, colonne de couverture ou None)
+    "Q1 cascade : autres substances de la classe affichées": ("fr_autres_classe_3m", lambda x: x > 0, None),
+    "Q2 Italie : même substance affichée": ("it_affichee_3m", lambda x: x > 0, "it_couvert"),
+    "Q2 Norvège : même substance déclarée": ("no_nouvelle_3m", lambda x: x > 0, "no_couvert"),
+    "Contrôle : même substance affichée en France": ("fr_affichee_3m", lambda x: x > 0, None),
 }
 
 
@@ -32,8 +34,8 @@ def calculer():
     resultat["jeux"] = {jeu: {"lignes": len(g), "positives": int(g["cible"].sum()), "taux": float(g["cible"].mean())}
                         for jeu, g in panel.groupby("jeu", observed=True)}
     resultat["expositions"] = {}
-    for nom, (colonne, regle) in EXPOSITIONS.items():
-        observe = panel.dropna(subset=[colonne])
+    for nom, (colonne, regle, couverture) in EXPOSITIONS.items():
+        observe = panel if couverture is None else panel[panel[couverture] == 1]
         exposee = regle(observe[colonne])
         resultat["expositions"][nom] = {
             "mois_couverts": int(observe["mois"].nunique()), "lignes": len(observe), "part_exposee": float(exposee.mean()),
@@ -57,19 +59,23 @@ def facteurs():
     for entree, sortie in [("conso_6m_pub", "conso"), ("sig_annee_pub", "sig"), ("sig_cumul_pub", "sig_cumul")]:
         t[sortie] = np.log1p(t[entree].astype("float64"))
     t["tendance"], t["saison"] = np.log(t["conso_tendance_6m"].astype("float64")), np.log(t["conso_saison_cible"].astype("float64"))
-    for c in ["fr_affichee_3m", "fr_autres_classe_3m", "it_affichee_3m"]:
+    for c in ["fr_affichee_3m", "fr_autres_classe_3m", "it_affichee_3m", "it_couvert", "no_nouvelle_3m", "no_couvert"]:
         t[c] = t[c].astype("float64")
     base = ["conso", "tendance", "saison", "ue_critique", "sig", "sig_cumul", "fr_affichee_3m"]
 
-    def auc(donnees, colonnes):
-        entrainement, test = (donnees[donnees["jeu"] == j] for j in ("entrainement", "test"))
+    def auc(donnees, colonnes, evaluation="test"):
+        entrainement, test = donnees[donnees["jeu"] == "entrainement"], donnees[donnees["jeu"] == evaluation]
         modele = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)).fit(entrainement[colonnes], entrainement["cible"])
         p = modele.predict_proba(test[colonnes])[:, 1]
         return {"auc": float(roc_auc_score(test["cible"], p)), "pr_auc": float(average_precision_score(test["cible"], p)),
                 "coef": dict(zip(colonnes, modele[-1].coef_[0]))}
 
+    # Norvège : couverte jusqu'en 06/2024, donc évaluée sur la validation couverte (01 à 06/2024), pas sur le test.
+    norvege = t[(t["jeu"] == "entrainement") | ((t["jeu"] == "validation") & (t["no_couvert"] == 1))]
     return {"Q1 sans": auc(t, base), "Q1 avec": auc(t, base + ["fr_autres_classe_3m"]),
-            "Q2 Italie sans": auc(t, base), "Q2 Italie avec": auc(t, base + ["it_affichee_3m"])}
+            "Q2 Italie sans": auc(t, base), "Q2 Italie avec": auc(t, base + ["it_affichee_3m", "it_couvert"]),
+            "Q2 Norvège sans (validation 01-06/2024)": auc(norvege, base, "validation"),
+            "Q2 Norvège avec (validation 01-06/2024)": auc(norvege, base + ["no_nouvelle_3m", "no_couvert"], "validation")}
 
 
 def pct(x):
@@ -85,9 +91,9 @@ def main():
     for nom, d in r["expositions"].items():
         print(f"{nom} : {d['mois_couverts']} mois, {d['lignes']:,} lignes ; exposées {pct(d['part_exposee'])} ; "
               f"positives {pct(d['positives_si_exposee'])} si oui, {pct(d['positives_sinon'])} sinon".replace(",", " "))
-    print("\nSignaux contrôlés (régression logistique, test 2025) :")
+    print("\nSignaux contrôlés (régression logistique, test 2025 sauf mention) :")
     for nom, d in facteurs().items():
-        print(f"  {nom:15} AUC {d['auc']:.3f}  PR-AUC {d['pr_auc']:.3f}")
+        print(f"  {nom:40} AUC {d['auc']:.3f}  PR-AUC {d['pr_auc']:.3f}")
 
 
 if __name__ == "__main__":

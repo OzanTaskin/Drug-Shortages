@@ -17,21 +17,21 @@ les méthodes vues en cours.
 - **Question principale** : peut-on anticiper les pénuries en France ? Pour une substance (code ATC5) au
   mois *t*, quelle est la probabilité d'au moins un signalement de rupture à l'ANSM entre *t*+1 et *t*+3 ?
 - **Q1, effet cascade** : une pénurie se propage-t-elle aux substituts (même classe ATC4) ?
-- **Q2, pénuries importées** : une pénurie en Italie ou en Allemagne annonce-t-elle une pénurie en France ?
+- **Q2, pénuries importées** : une pénurie en Italie, en Allemagne ou en Norvège annonce-t-elle une pénurie en France ?
 
 La France est au centre : c'est le seul pays dont on a l'univers complet des médicaments, y compris ceux
-qui ne sont jamais en pénurie. L'Italie et l'Allemagne servent de signaux. Détails dans
+qui ne sont jamais en pénurie. L'Italie, l'Allemagne et la Norvège servent de signaux. Détails dans
 [EXPLICATIONS.md](EXPLICATIONS.md), section 1.
 
 ## Avancement
 
 | Étape | Statut |
 |---|---|
-| Niveau 1 : collecte des sources brutes | ✅ 289 fichiers, environ 500 Mo, empreintes vérifiées |
-| Niveau 2 : tables nettoyées | ✅ 22 tables, dont `shortage_events` (16 769 épisodes FR/IT/DE) et `ansm_signalements` (22 501 signalements 2019-2025) ; 34 contrôles automatiques |
+| Niveau 1 : collecte des sources brutes | ✅ 393 fichiers, environ 680 Mo, empreintes vérifiées ; ancien site de l'ANSM (2015-2021), Italie depuis 2019, registres norvégiens 2019-2024 |
+| Niveau 2 : tables nettoyées | ✅ 25 tables, dont `shortage_events` (28 070 épisodes FR/IT/DE/NO) et `ansm_signalements` (22 501 signalements 2019-2025) ; contrôles automatiques |
 | Livrable 1 : rapport de 2 pages | ✅ `Rapport-DALAS-Deliverable1/` |
 | Consommation mensuelle (Medic'AM) | ✅ `consommation_mensuelle` : 1 560 substances × 138 mois (01/2015 à 06/2026) ; 3 variables dans `panel_fr` |
-| Niveau 3 : table d'entraînement `panel_fr` | ✅ **complète, sans valeur vide** : 40 710 lignes (885 substances délivrées en ville × 46 mois, 12/2021 à 09/2025), cible, 14 variables, découpage temporel ; contrôles anti-fuite (recalcul, perturbation) ; voir [EXPLICATIONS.md](EXPLICATIONS.md), section 6 |
+| Niveau 3 : table d'entraînement `panel_fr` | ✅ **complète, sans valeur vide** : 58 410 lignes (885 substances délivrées en ville × 66 mois, 04/2020 à 09/2025), cible, 14 variables et 2 indicateurs de couverture (Italie, Norvège), découpage temporel ; contrôles anti-fuite (recalcul, perturbation) ; voir [EXPLICATIONS.md](EXPLICATIONS.md), section 6 |
 | TME6 : dashboard | ⏳ |
 | TME9 : rapport final | ⏳ |
 
@@ -72,8 +72,9 @@ collecte/                 niveau 1
 ├── sources_actuelles.py  photo du jour : BDPM, ANSM, AIFA, BfArM, liste critique de l'UE
 ├── ansm_signalements.py  signalements de rupture, un classeur par an (2019-2025)
 ├── open_medic.py         consommation 2019-2025
+├── norvege.py            registres annuels des pénuries en Norvège (DMP, 2019 → 07/2024, archivés)
 ├── medicam.py            consommation mensuelle 2015 à 06/2026 (Medic'AM)
-├── wayback.py            archives mensuelles de la Wayback Machine
+├── wayback.py            archives mensuelles de la Wayback Machine (dont l'ancien site de l'ANSM, 2015-2021)
 └── verification.py       empreintes de la couche brute conformes au manifeste
 
 nettoyage/                niveau 2 : une étape par fichier, lancées dans l'ordre
@@ -88,7 +89,7 @@ nettoyage/                niveau 2 : une étape par fichier, lancées dans l'ord
 ├── ansm_fiches.py        chaque fiche ANSM reliée à un médicament et un ATC5
 ├── ansm_episodes.py      observations → épisodes de pénurie
 ├── ansm_signalements.py  classeurs → ansm_signalements
-├── europe.py             Italie, Allemagne → europe_observations, europe_episodes
+├── europe.py             Italie, Allemagne, Norvège → europe_observations, europe_episodes
 ├── evenements.py         table centrale shortage_events
 ├── france_mensuel.py     → penuries_fr_mensuel (substance × mois)
 ├── controles.py          contrôles des tables du niveau 2

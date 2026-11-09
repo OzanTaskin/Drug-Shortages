@@ -11,7 +11,7 @@ Sinon, on vérifie que chaque fichier brut correspond à son empreinte dans le m
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 
-from . import ansm_signalements, medicam, open_medic, sources_actuelles, verification, wayback
+from . import ansm_signalements, medicam, norvege, open_medic, sources_actuelles, verification, wayback
 from .commun import creer_session
 
 COLLECTES = {
@@ -19,6 +19,7 @@ COLLECTES = {
     "ansm_signalements": ansm_signalements.collecter,
     "open_medic": open_medic.collecter,
     "medicam": medicam.collecter,
+    "norvege": norvege.collecter,
     "wayback": wayback.collecter,
 }
 

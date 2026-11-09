@@ -14,7 +14,7 @@ Règles (vérifiées sur les données le 08/10/2026) :
 - Une absence d'une seule photo ne coupe pas l'épisode (archives irrégulières).
 - Fiche vue seulement au statut « remise à disposition » : la pénurie a eu lieu entre deux photos.
   L'épisode est gardé, avec un début inconnu (`debut` vide, `debut_au_plus_tot` = photo précédente).
-- Épisode déjà en cours à la première photo (avril 2021) : `censure_gauche` = vrai.
+- Épisode déjà en cours à la première photo de son site : `censure_gauche` = vrai.
 - `premiere_photo` : première photo où l'épisode est visible (actif ou remis à disposition) :
   c'est la date à laquelle le public le sait.
 - `fin_connue_le` : photo où l'on voit que l'épisode est terminé (remise à disposition ou arrêt
@@ -22,6 +22,13 @@ Règles (vérifiées sur les données le 08/10/2026) :
   « accumulating snapshot » : à une date d, `fin`, `type_fin` et `duree_jours` ne sont connus que si
   `fin_connue_le < d`. Une variable de prédiction ne doit pas les lire sans ce filtre.
 - Épisode encore actif à la dernière photo : `en_cours` = vrai, `fin` vide.
+- Deux sites : l'ancien (photos de 02/2015 à 03/2021) et l'actuel (depuis 04/2021). Les fiches ne se
+  correspondent pas d'un site à l'autre : les épisodes sont construits site par site. Un épisode encore
+  actif à la dernière photo de l'ancien site est fermé au changement de site (`type_fin` =
+  « changement_de_site », `fin` = dernière photo active, `fin_connue_le` = première photo du nouveau site) :
+  sa vraie fin est inconnue, sa durée est un minimum. Il continue sur le nouveau site, où il est déjà en
+  cours à la première photo (`censure_gauche` = vrai) : ni l'un ni l'autre ne compte comme nouvelle
+  pénurie au changement de site, et l'affichage reste continu.
 """
 import pandas as pd
 
@@ -95,12 +102,17 @@ def construire():
     fiches = pd.read_parquet(CLEAN / "ansm_fiches.parquet")
     dispo = pd.read_parquet(CLEAN / "bdpm_dispo_observations.parquet")
 
-    photos = sorted(observations["date_photo"].unique())
-    rang = {photo: i for i, photo in enumerate(photos)}
     lignes = []
-    for fiche, obs in observations.groupby("fiche", sort=False):
-        for numero, episode in enumerate(episodes_d_une_fiche(obs, photos, rang), start=1):
-            lignes.append({"fiche": fiche, "numero_episode": numero, **episode})
+    premiere_actuelle = observations.loc[observations["site"] == "actuel", "date_photo"].min()
+    for site, du_site in observations.groupby("site", sort=False):
+        photos = sorted(du_site["date_photo"].unique())
+        rang = {photo: i for i, photo in enumerate(photos)}
+        for fiche, obs in du_site.groupby("fiche", sort=False):
+            for numero, episode in enumerate(episodes_d_une_fiche(obs, photos, rang), start=1):
+                if site == "ancien" and episode["type_fin"] == "en_cours":
+                    episode.update(fin=episode["derniere_photo_active"], type_fin="changement_de_site",
+                                   fin_connue_le=premiere_actuelle)
+                lignes.append({"fiche": fiche, "site": site, "numero_episode": numero, **episode})
     episodes = pd.DataFrame(lignes)
 
     # Date de début exacte de la BDPM, quand elle existe et tombe dans la fenêtre de l'épisode.

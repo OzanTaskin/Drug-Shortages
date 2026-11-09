@@ -1,12 +1,18 @@
 """Niveau 3 — `panel_fr` : la table d'entraînement, une ligne par substance (ATC5) et par mois t.
 
-Panel COMPLET : aucune valeur vide. Trois choix l'assurent (décidés avec les porteurs du projet) :
-- période : t de 12/2021 à 09/2025, quand la France (page ANSM depuis 06/2021) et l'Italie (depuis
-  12/2021) sont couvertes sur les trois mois précédents. Le dernier t a ses trois mois de cible
-  complets (signalements publiés jusqu'en 12/2025) ;
+Panel COMPLET : aucune valeur vide. Les choix qui l'assurent (décidés avec les porteurs du projet) :
+- période : t de 04/2020 à 09/2025. La page ANSM est couverte depuis 2015 (ancien site jusqu'en 03/2021,
+  puis le site actuel) ; les signalements de 2019, première année publiée, sont lus à partir d'avril 2020.
+  Le dernier t a ses trois mois de cible complets (signalements publiés jusqu'en 12/2025) ;
 - cohorte : substances à médicament d'intérêt thérapeutique majeur (MITM) commercialisé (les signalements
   ne concernent que ces médicaments) ET délivrées en ville, donc présentes dans Medic'AM. Les substances
-  réservées à l'hôpital (338 sur 1 223, consommation inconnue) sont exclues ;
+  réservées à l'hôpital (consommation inconnue) sont exclues ;
+- signaux européens couverts sur une partie seulement de la période : la valeur vaut 0 hors couverture et
+  une colonne `*_couvert` (0/1) dit si la source couvrait le mois. Un modèle doit lire les deux ensemble ;
+  « 0 et couvert » veut dire « pas de pénurie publiée », « 0 et non couvert » veut dire « on ne sait pas ».
+    Italie (`it_affichee_3m`) : photos mensuelles de la liste AIFA depuis 10/2021, couvert pour t ≥ 12/2021 ;
+    Norvège (`no_nouvelle_3m`) : registre de la DMP, classeurs 2019 au 12/07/2024, couvert pour
+    t ≤ 06/2024 ;
 - l'Allemagne n'est pas dans le panel : 13 mois d'archives seulement (depuis 09/2024).
 
 Cible `cible` : 1 si au moins un signalement de rupture est déclaré à l'ANSM pour la substance
@@ -40,10 +46,12 @@ FINAL = RACINE / "data" / "final"
 MOIS = pd.period_range("2019-01", "2025-12", freq="M")  # période couverte par les signalements
 HORIZON = 3
 T = len(MOIS) - HORIZON  # dernier t : ses 3 mois de cible sont complets
-PAYS = ("FR", "IT")  # l'Allemagne (depuis 09/2024) est hors panel : trop peu d'archives pour être complète
-PREMIER_T = pd.Period("2021-12", "M")  # premier t dont les 3 mois précédents sont couverts en France et en Italie
+PAYS = ("FR", "IT")  # pays dont on lit la liste affichée ; l'Allemagne (depuis 09/2024) est hors panel
+PREMIER_T = pd.Period("2020-04", "M")  # premier t où la dernière année de signalements publiée (2019) existe
 DEBUT = int((PREMIER_T - MOIS[0]).n)
-DECOUPAGE = [("entrainement", "2021-12", "2023-09"), ("ecart", "2023-10", "2023-12"),
+# Couverture des signaux européens : (premier t couvert, dernier t couvert), bornes comprises.
+COUVERTURE = {"it": (pd.Period("2021-12", "M"), None), "no": (None, pd.Period("2024-06", "M"))}
+DECOUPAGE = [("entrainement", "2020-04", "2023-09"), ("ecart", "2023-10", "2023-12"),
              ("validation", "2024-01", "2024-09"), ("ecart", "2024-10", "2024-12"), ("test", "2025-01", "2025-09")]
 
 
@@ -109,10 +117,20 @@ def autres_de_la_classe(matrice, substances):
 
 
 def variables_page(evenements, substances):
-    """Variables issues des pénuries publiées (France, Italie), sur les 3 derniers mois."""
+    """Variables issues des pénuries publiées, sur les 3 derniers mois : listes affichées (France, Italie)
+    et nouvelles déclarations norvégiennes (date de déclaration seule : la fin d'un épisode norvégien n'est
+    connue qu'au classeur annuel suivant)."""
     pages = {pays: sur_3_mois(affichage_mensuel(evenements[evenements["pays"] == pays], substances)) for pays in PAYS}
+    norvege = evenements[evenements["pays"] == "NO"].dropna(subset=["atc5"])
     return {"fr_affichee_3m": pages["FR"], "fr_autres_classe_3m": autres_de_la_classe(pages["FR"], substances),
-            "it_affichee_3m": pages["IT"]}
+            "it_affichee_3m": pages["IT"],
+            "no_nouvelle_3m": sur_3_mois(presence_mensuelle(norvege, "publication", substances))}
+
+
+def couvert(prefixe, mois):
+    """1 si le signal européen `prefixe` est couvert au mois t (bornes de COUVERTURE)."""
+    premier, dernier = COUVERTURE[prefixe]
+    return np.array([(premier is None or t >= premier) and (dernier is None or t <= dernier) for t in mois])
 
 
 def matrice_conso(mensuelle, substances):
@@ -192,10 +210,16 @@ def construire():
         table.loc[(table["mois"] >= pd.Period(a, "M").to_timestamp()) & (table["mois"] <= pd.Period(b, "M").to_timestamp()), "jeu"] = jeu
     table["jeu"] = table["jeu"].astype(pd.CategoricalDtype(["entrainement", "validation", "test", "ecart"]))
 
-    # Pénuries publiées (France, Italie) : couvertes sur tout le panel, donc sans valeur vide.
+    # Pénuries publiées : France couverte sur tout le panel ; Italie et Norvège à 0 hors couverture,
+    # avec leur indicateur de couverture.
     for nom, matrice in variables_page(evenements, tout).items():
         type_entier = "int16" if nom == "fr_autres_classe_3m" else "int8"
-        table[nom] = matrice[lignes][:, DEBUT:T].astype(type_entier).ravel()
+        valeurs = matrice[lignes][:, DEBUT:T].astype(type_entier)
+        if nom[:2] in COUVERTURE:
+            masque = couvert(nom[:2], mois)
+            valeurs = valeurs * masque
+            table[f"{nom[:2]}_couvert"] = np.tile(masque, len(avec)).astype("int8")
+        table[nom] = valeurs.ravel()
 
     # Signalements des années déjà publiées (dernière année publiée, et cumul jusqu'à elle)
     par_annee = (signalements.groupby(["atc5", "annee"]).size().unstack(fill_value=0)
@@ -243,6 +267,15 @@ def controler(table, avec, evenements, tout, C, presentes, mois_c):
     vides = int(table.isna().sum().sum())
     verifier("panel complet : aucune valeur vide", vides == 0, f"{vides} valeurs vides : {table.isna().sum()[lambda x: x > 0].to_dict()}")
     verifier(f"premier mois = {PREMIER_T}", table["mois"].min() == PREMIER_T.to_timestamp(), f"{table['mois'].min()}")
+    for prefixe, (premier, dernier) in COUVERTURE.items():
+        hors = table[f"{prefixe}_couvert"] == 0
+        signal = [c for c in table.columns if c.startswith(prefixe + "_") and c != f"{prefixe}_couvert"][0]
+        verifier(f"{signal} = 0 hors couverture", (table.loc[hors, signal] == 0).all(), "valeur hors couverture")
+        mois_couverts = table.loc[~hors, "mois"]
+        verifier(f"{prefixe}_couvert dans ses bornes", (premier is None or mois_couverts.min() >= premier.to_timestamp())
+                 and (dernier is None or mois_couverts.max() <= dernier.to_timestamp()), "bornes non respectées")
+    verifier("dernière année de signalements lue ≥ 2019 (première publiée)",
+             derniere_annee_publiee(table["annee"].to_numpy(), table["mois_num"].to_numpy()).min() >= 2019, "année absente lue")
     taux = table["cible"].mean()
     verifier("taux de cas positifs plausible (15 % à 40 %)", 0.15 < taux < 0.40, f"{taux:.3f}")
     for avant, apres in [("entrainement", "validation"), ("validation", "test")]:

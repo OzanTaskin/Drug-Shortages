@@ -7,6 +7,10 @@ plus sûre à la moins sûre ; la colonne `methode_rapprochement` dit laquelle a
 3. substance   la substance ANSM correspond à une substance de la BDPM ou à un libellé ATC5,
                une fois retirés les sels et formes chimiques (« chlorhydrate de », « sodique »…) ;
 4. marque      le premier mot du nom (la marque) correspond à des médicaments BDPM d'un seul ATC5.
+5. marque_ansm  la marque est celle d'autres fiches ANSM déjà reliées, toutes au même ATC5 : surtout des
+               fiches de l'ancien site (2015-2021) dont le médicament a depuis quitté la BDPM.
+6. bdpm_historique  nom identique, sinon marque, dans les versions passées de la BDPM (médicaments
+               retirés depuis) ; l'ATC vient de leurs présentations dans Open Medic (`cip_atc`).
 """
 import pandas as pd
 
@@ -95,6 +99,31 @@ def construire():
                           "atc5": atc5, "methode_rapprochement": methode if atc5 else None})
 
     fiches = fiches.merge(pd.DataFrame(resultats), on="fiche")
+
+    # 5. Marque partagée avec des fiches déjà reliées (n'importe quel site).
+    marque = fiches["medicament"].map(lambda m: (normaliser_texte(m).split() or [None])[0])
+    connues = fiches["atc5"].notna() & ~marque.isin(MOTS_GENERIQUES)
+    atc_par_marque_ansm = fiches[connues].groupby(marque[connues])["atc5"].agg(atc_unique).dropna()
+    a_completer = fiches["atc5"].isna() & marque.isin(atc_par_marque_ansm.index)
+    fiches.loc[a_completer, "atc5"] = marque[a_completer].map(atc_par_marque_ansm)
+    fiches.loc[a_completer, "methode_rapprochement"] = "marque_ansm"
+
+    # 6. Versions passées de la BDPM : médicaments retirés depuis, absents de `produits`.
+    historique = lire("bdpm_specialites_historique").drop_duplicates("cis", keep="last")
+    atc_du_cip = (lire("bdpm_presentations_historique")[["cip13", "cis"]].drop_duplicates()
+                  .merge(lire("cip_atc")[["cip13", "atc5"]], on="cip13").groupby("cis")["atc5"].agg(atc_unique))
+    historique["atc5"] = historique["cis"].map(atc_du_cip).fillna(historique["cis"].map(atc_du_cis))
+    # Open Medic contient aussi des codes de classe (5 caractères) : seuls les ATC5 complets sont gardés.
+    historique["atc5"] = historique["atc5"].where(historique["atc5"].str.fullmatch(r"[A-Z]\d{2}[A-Z]{2}\d{2}", na=False))
+    historique["nom"] = historique["denomination"].map(normaliser_texte)
+    historique["marque"] = historique["nom"].str.split().str[0]
+    par_nom = historique.groupby("nom")["atc5"].agg(atc_unique).dropna()
+    par_marque = historique.groupby("marque")["atc5"].agg(atc_unique).dropna()
+    nom = fiches["medicament"].map(normaliser_texte)
+    trouve = nom.map(par_nom).fillna(marque.where(~marque.isin(MOTS_GENERIQUES)).map(par_marque))
+    a_completer = fiches["atc5"].isna() & trouve.notna()
+    fiches.loc[a_completer, "atc5"] = trouve[a_completer]
+    fiches.loc[a_completer, "methode_rapprochement"] = "bdpm_historique"
     enregistrer(fiches, "ansm_fiches")
     print("  rapprochement ATC des fiches :",
           fiches["methode_rapprochement"].value_counts(dropna=False).to_dict())

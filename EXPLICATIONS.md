@@ -68,11 +68,18 @@ Toutes sont publiques et officielles, collectées par `python -m collecte` (05/1
 |---|---|
 | **AIFA** (Italie, CSV) | environ 2 500 pénuries, avec code ATC, dates, raison et équivalents |
 | **BfArM** (Allemagne, CSV) | 963 déclarations, avec ATC, dates et **raison** de la pénurie |
+| **DMP** (Norvège, XLSX annuels, via la Wayback Machine) | registre des pénuries 2019 → 12/07/2024 : 6 499 épisodes, avec **date de déclaration**, période, cause, statut, ATC (97 %) |
 | **Liste critique de l'UE** (EMA, XLSX) | 299 substances critiques, avec code ATC5 et **date d'inscription** (12/2023 → 2025) |
 
 **Sources écartées.** L'Espagne (API CIMA) ne donne ni historique ni code ATC ; les 85 pénuries suivies par
 l'EMA n'apportaient rien. Collectées au début, elles ont été retirées le 15/10/2026. Seule la liste
 critique de l'UE a été gardée, parce que sa date d'inscription la rend utilisable sans fuite.
+
+**Pays examinés le 09/11/2026.** Norvège retenue (ci-dessus). Finlande (Fimea) : fichier ouvert, mais pénuries
+en cours seulement, sans ATC, et 4 archives depuis 11/2024. Suède, Tchéquie : données ouvertes à l'état du jour,
+historique consultable en ligne seulement, rien d'archivé. Autriche, Belgique, Pays-Bas, Suisse, Portugal : aucun
+fichier de pénuries archivé trouvé ; Espagne et Irlande non vérifiées (archive indisponible). Allemagne : la page
+web du BfArM est archivée depuis 2021, mais ses données sont chargées par JavaScript et absentes des captures.
 
 ### L'historique : les archives de la Wayback Machine (`wayback/`)
 
@@ -81,8 +88,10 @@ archive par mois des listes, ce qui permet de reconstruire ce qui était publié
 
 | Archives | Nombre | Période | Usage |
 |---|---:|---|---|
-| Page ANSM | 58 | 04/2021 → 09/2026 | épisodes de pénurie en France |
-| Liste italienne | 47 | 10/2021 → 09/2026 | épisodes en Italie |
+| Page ANSM, ancien site | 52 | 02/2015 → 03/2021 | épisodes de pénurie en France avant le site actuel |
+| Page ANSM | 62 | 04/2021 → 09/2026 | épisodes de pénurie en France (dont 2 mois pris sur la même liste triée autrement) |
+| Liste italienne | 54 | 08/2019 → 10/2026 | épisodes en Italie (7 photos de 2019-2021 sous les adresses versionnées du fichier ; mensuelle depuis 10/2021) |
+| Registre norvégien | 6 | 2019 → 07/2024 | épisodes en Norvège (un classeur par an, archivé) |
 | Liste allemande | 12 | 07/2024 → 09/2026 | épisodes en Allemagne (historique court) |
 | Disponibilité BDPM | 11 | 12/2023 → 03/2026 | date de début exacte des pénuries françaises |
 | BDPM : médicaments, boîtes, génériques | 41 + 39 + 41 | 02/2015 → 03/2026 | le marché **tel qu'il était** à chaque date |
@@ -342,6 +351,14 @@ virgule flottante, précision des dates selon la version de pandas) a été corr
 
 ## 6. La table d'entraînement (niveau 3, construite) et la suite
 
+> **Mise à jour du 09/11/2026 (2) : panel étendu.** Avec l'ancien site de l'ANSM, la France est couverte depuis 2015 :
+> le panel commence en **04/2020** (premier mois où la dernière année de signalements publiée, 2019, existe) et compte
+> **58 410 lignes** (885 substances × 66 mois), toujours sans valeur vide. L'Italie (t ≥ 12/2021) et la Norvège
+> (`no_nouvelle_3m`, nouvelles déclarations sur 3 mois, t ≤ 06/2024) ne couvrent qu'une partie de la période : leur
+> signal vaut 0 hors couverture et `it_couvert` / `no_couvert` disent quand. Entraînement 04/2020 → 09/2023
+> (37 170 lignes, 28,9 % de positifs). Régression logistique : AUC test 0,856 sans Q2, 0,860 avec l'Italie ;
+> Norvège évaluée sur la validation couverte (01-06/2024) : 0,839 sans, 0,840 avec.
+>
 > **Mise à jour du 09/11/2026 : panel complet.** Le panel décrit ci-dessous (99 063 lignes) a été refait. Il compte
 > désormais **40 710 lignes sans aucune valeur vide** : 885 substances délivrées en ville × 46 mois (12/2021 à 09/2025).
 > Trois choix l'ont permis : la période commence quand la France et l'Italie sont couvertes ; l'Allemagne (13 mois
@@ -411,8 +428,14 @@ Le plan suit l'ordre imposé par le cours 1 (diapos 53 à 63).
 - La liste MITM et les compositions ne sont connues qu'à leur état de 2026.
 - Les pénuries trop courtes pour apparaître entre deux archives sont invisibles côté page ANSM (pas côté
   signalements).
-- Les archives sont irrégulières : 8 mois sans photo sur 67 pour la page ANSM, 13 sur 61 pour l'Italie,
-  15 sur 28 pour l'Allemagne ; les dates de fin y sont approximatives.
+- Les archives sont irrégulières : de 01/2019 à 09/2025, 13 mois sans photo sur 81 pour la page ANSM ; l'Italie
+  n'a que 7 photos avant 10/2021 et aucune de 12/2025 à 08/2026 ; l'Allemagne 13 photos ; les dates de fin y sont
+  approximatives.
+- L'ancien et le nouveau site de l'ANSM ne partagent pas d'identifiant de fiche : une pénurie en cours en 04/2021
+  devient deux épisodes (le premier `censure_droite`, le second `censure_gauche`). 20 % des fiches de l'ancien site
+  restent sans ATC (médicaments retirés depuis).
+- Norvège : on suppose la pénurie publiée le jour de sa déclaration ; sa fin n'est connue qu'au classeur annuel
+  suivant, d'où un signal limité aux nouvelles déclarations ; rien après 07/2024 (pas de signal pour le test 2025).
 - Les définitions de « pénurie » diffèrent entre pays : les signaux européens sont des indicateurs, pas des
   mesures comparables.
 - Une partie de la hausse des signalements est un effet de déclaration, pas de pénurie.

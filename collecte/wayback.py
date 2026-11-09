@@ -15,11 +15,20 @@ from .commun import RAW, telecharger
 CDX = "https://web.archive.org/cdx/search/cdx"
 BDPM_ANCIEN = "base-donnees-publique.medicaments.gouv.fr/telechargement.php?fichier="
 BDPM_NOUVEAU = "base-donnees-publique.medicaments.gouv.fr/download/file/"
+ANSM = "ansm.sante.fr/disponibilites-des-produits-de-sante/medicaments"
+AIFA = "www.aifa.gov.it/documents/20142/847339/elenco_medicinali_carenti.csv"
 
-# (nom de la cible, extension, URLs archivées). Plusieurs URLs quand le site a changé d'adresse.
+# (nom de la cible, extension, URLs archivées). Plusieurs URLs quand le site a changé d'adresse :
+# la première a priorité, les suivantes ne comblent que les mois où elle n'a pas de capture.
 CIBLES = [
-    ("ansm_disponibilites", "html", ["ansm.sante.fr/disponibilites-des-produits-de-sante/medicaments"]),
-    ("aifa_carenti", "csv", ["www.aifa.gov.it/documents/20142/847339/elenco_medicinali_carenti.csv"]),
+    # La même liste triée autrement (paramètres d'adresse) comble deux mois sans capture de l'adresse simple.
+    ("ansm_disponibilites", "html", [ANSM, ANSM + "?orderIndex=0&order=DESC", ANSM + "?orderIndex=0&order=ASC"]),
+    # Ancien site de l'ANSM (jusqu'en 03/2021) : même liste, autre adresse et autre mise en page.
+    ("ansm_ancien", "html", ["ansm.sante.fr/S-informer/Informations-de-securite-Ruptures-de-stock-des-medicaments"]),
+    # Le même fichier AIFA a aussi été servi avec un identifiant de version dans l'adresse (2019-2022).
+    ("aifa_carenti", "csv", [AIFA, AIFA + "/34b6d134-14b5-ac8c-c147-b94d4ff7701a",
+                             AIFA + "/2cbc1856-37fd-5552-5586-c988cf718d5d",
+                             AIFA + "/d59ce42a-6cc2-fdd5-9f2a-3784533c8ac2"]),
     ("bfarm_lieferengpaesse", "csv", ["anwendungen.pharmnet-bund.de/lieferengpassmeldungen/public/csv"]),
     ("bdpm_dispo", "txt", [BDPM_ANCIEN + "CIS_CIP_Dispo_Spec.txt", BDPM_NOUVEAU + "CIS_CIP_Dispo_Spec.txt"]),
     # Versions passées de l'univers des médicaments : structure du marché connue à chaque date.

@@ -1,7 +1,7 @@
 {
  "panel_fr": {
-  "construite_le": "2026-11-09T12:46:09",
-  "lignes": 40710,
+  "construite_le": "2026-11-09T13:13:21",
+  "lignes": 58410,
   "colonnes": [
    "atc5",
    "mois",
@@ -11,7 +11,10 @@
    "jeu",
    "fr_affichee_3m",
    "fr_autres_classe_3m",
+   "it_couvert",
    "it_affichee_3m",
+   "no_couvert",
+   "no_nouvelle_3m",
    "sig_annee_pub",
    "sig_cumul_pub",
    "conso_6m_pub",
@@ -21,22 +24,25 @@
   ],
   "valeurs_vides": 0,
   "sommes": {
-   "cible": 13970.0,
-   "annee": 82370490.0,
-   "mois_num": 257535.0,
-   "fr_affichee_3m": 5711.0,
-   "fr_autres_classe_3m": 17298.0,
-   "it_affichee_3m": 15823.0,
-   "sig_annee_pub": 145060.0,
-   "sig_cumul_pub": 429548.0,
-   "conso_6m_pub": 44236851262.0,
-   "conso_tendance_6m": 1562259.25,
-   "conso_saison_cible": 42562.86,
+   "cible": 17929.0,
+   "annee": 118134225.0,
+   "mois_num": 379665.0,
+   "fr_affichee_3m": 7136.0,
+   "fr_autres_classe_3m": 21835.0,
+   "it_couvert": 40710.0,
+   "it_affichee_3m": 15941.0,
+   "no_couvert": 45135.0,
+   "no_nouvelle_3m": 4834.0,
+   "sig_annee_pub": 175812.0,
+   "sig_cumul_pub": 469692.0,
+   "conso_6m_pub": 62081487462.0,
+   "conso_tendance_6m": 3024610.25,
+   "conso_saison_cible": 60668.93,
    "ue_critique": 3380.0
   },
-  "empreinte_contenu": "577e3245939e7140",
-  "commit": "6264a54+modifs",
-  "empreinte_code": "9d3c832cb81b07df",
-  "empreinte_brut": "d1fe1e97fdd4a7fc"
+  "empreinte_contenu": "052bf5ccf4758914",
+  "commit": "05b5ccd+modifs",
+  "empreinte_code": "d2a137802c0c7973",
+  "empreinte_brut": "15b1a9159c9ccaf6"
  }
 }
