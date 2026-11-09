@@ -1,0 +1,271 @@
+\documentclass[10.5pt, a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage[margin=2cm, top=1.8cm, bottom=1.8cm]{geometry}
+\usepackage{parskip}
+\setlength{\parskip}{0.5\baselineskip plus 1pt minus 1pt}
+\usepackage{enumitem}
+\setlist{itemsep=1pt, parsep=0pt, topsep=2pt}
+\frenchsetup{ItemLabels=\textbullet}
+\setlist[itemize]{label=\textbullet}
+\usepackage{graphicx,booktabs,tabularx,caption,float,titlesec,fancyhdr}
+\usepackage{amssymb}
+\usepackage[table]{xcolor}
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, shadows, calc}
+\usepackage[hidelinks]{hyperref}
+\definecolor{gris}{HTML}{6B7280}
+\definecolor{bleu}{HTML}{2A78D6}
+\definecolor{vert}{HTML}{1BAF7A}
+\definecolor{orange}{HTML}{E08A1E}
+\newcommand{\entete}[1]{\textbf{\color{gris!20!black}#1}}
+\newcommand{\filet}{\arrayrulecolor{gris!40}\hline}
+\newcommand{\var}[1]{\texttt{\color{gris!30!black}#1}}
+\titleformat{\section}{\large\bfseries\color{bleu!80!black}}{\thesection}{0.6em}{}
+\titleformat{\subsection}{\normalsize\bfseries\color{gris!15!black}}{\thesubsection}{0.5em}{}
+\titlespacing*{\section}{0pt}{2.2ex plus 0.5ex}{1ex}
+\titlespacing*{\subsection}{0pt}{1.6ex}{0.6ex}
+\captionsetup{skip=4pt, font=small}
+\pagestyle{fancy}\fancyhf{}
+\renewcommand{\headrulewidth}{0.3pt}
+\fancyhead[L]{\small\color{gris}DALAS --- Livrable 2 : plan du dashboard}
+\fancyhead[R]{\small\color{gris}Ozan Taskin, Rahim Belkacemi}
+\fancyfoot[C]{\small\thepage}
+\newcommand{\encart}[2]{\par\noindent\begin{tikzpicture}\node[draw=#1!50, fill=#1!7, rounded corners=4pt, inner sep=6pt, text width=\dimexpr\linewidth-14pt\relax, align=left]{#2};\end{tikzpicture}\par}
+
+\begin{document}
+
+\begin{center}
+{\LARGE\bfseries Livrable 2 : le dashboard d'exploration}\\[3pt]
+{\large Plan de travail complet}\\[2pt]
+{\small Les pénuries de médicaments en France --- 9 novembre 2026}
+\end{center}
+
+\encart{bleu}{\textbf{En une phrase.} Une application web locale (Plotly Dash), lancée par deux commandes, qui permet
+d'explorer le dataset par \textbf{sept vues taillées pour ses données} : séries temporelles par pays, arbre
+thérapeutique ATC, heatmap substances $\times$ mois lisible, distributions en échelle logarithmique, fiche
+substance avec diagramme de Gantt des épisodes, comparaison des pays, et qualité des données. Elle explore ; elle ne
+répond pas encore à la question de recherche.}
+
+\section{Ce que l'énoncé demande, et comment nous le lisons}
+
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{5.2cm} >{\raggedright\arraybackslash}X}
+\rowcolor{gris!14}\entete{Exigence de l'énoncé} & \entete{Notre réponse}\\
+Facile à lancer pour l'enseignant & Un dossier \texttt{dashboard/} autonome : \texttt{pip install}, puis
+\texttt{python dashboard/app.py}. Il embarque son propre résumé de données (quelques Mo), car \texttt{data/} (500\,Mo)
+n'est pas sur GitHub. Un export HTML statique sert de plan B. \\
+Rapide : sous-ensemble ou résumé & Tables pré-agrégées par un script de construction (§\ref{sec:donnees}) ; aucune
+lecture des 500\,Mo bruts au lancement. \\
+Pas de visualisations par défaut & Chaque vue est choisie selon la nature des données (§\ref{sec:nature}) : temps,
+hiérarchie ATC, asymétrie forte, épisodes avec début et fin. \\
+Heatmap lisible malgré beaucoup de variables & On n'affiche jamais 1\,223 substances $\times$ 81 mois brut :
+agrégation par classe ATC, ordre par clustering, échelle log, variables choisies (§\ref{sec:pages}, vue 3). \\
+Explorer et comprendre, pas répondre & Aucun modèle, aucune prédiction. On montre ce que contient le dataset, ses
+trous et ses biais ; les hypothèses Q1 et Q2 sont seulement rendues \emph{visibles}. \\
+\filet
+\end{tabularx}
+
+\section{Ce que sont nos données, donc quelles visualisations}\label{sec:nature}
+
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.1cm} >{\raggedright\arraybackslash}X >{\raggedright\arraybackslash}p{4.6cm}}
+\rowcolor{gris!14}\entete{Nature} & \entete{Dans notre dataset} & \entete{Visualisation adaptée}\\
+Série temporelle & 81 mois (01/2019--09/2025) de signalements ; photos Wayback irrégulières pour les épisodes
+(FR depuis 04/2021) & Courbes par pays, curseur de période, cartes de saisonnalité année $\times$ mois, zones grises
+là où l'on n'a pas d'archive \\
+Hiérarchie & ATC : 14 classes (ATC1), 74 sous-classes (ATC2), jusqu'à 1\,223 substances (ATC5) & Treemap / sunburst
+cliquable, lignes de heatmap regroupées par classe \\
+Asymétrie forte & Durées : médiane 128\,j, 18\,\% $>$ 1 an ; consommation et signalements par laboratoire
+(557 labos) très concentrés & Axes logarithmiques, ECDF, boîtes à moustaches ; médiane et quartiles, jamais la moyenne seule \\
+Épisodes (début--fin) & 13\,634 pénuries FR/IT/DE + 3\,135 arrêts définitifs italiens & Diagramme de Gantt par
+substance ; les épisodes en cours sont prolongés jusqu'à la date de l'archive \\
+Panel déséquilibré & Variables du panel : de 0 \% à 84 \% de valeurs absentes (Allemagne 84 \%, consommation 46 \%) &
+Matrice de manquants ; cases grises, jamais des zéros \\
+Géographie & Seulement trois pays (FR, IT, DE), pas de coordonnées & Pas de carte par défaut (voir §\ref{sec:questions}) \\
+\filet
+\end{tabularx}
+
+\section{Architecture technique}
+
+\begin{center}
+\begin{tikzpicture}[
+  bloc/.style={rounded corners=5pt, fill=#1!9, draw=#1!40, line width=0.6pt, align=center, font=\footnotesize,
+               minimum height=1.2cm, text width=3.0cm, inner sep=4pt},
+  fl/.style={-{Latex[length=4pt,width=5pt]}, line width=1.2pt, gray!55}]
+\node[bloc=gris] (a) {\textbf{data/clean/}\\ \textbf{data/final/}\\ 22 tables + panel\_fr\\ (non versionnés)};
+\node[bloc=bleu, right=0.7cm of a] (b) {\textbf{build\_summary.py}\\ agrège, applique les\\ transformations log,\\ écrit les résumés};
+\node[bloc=vert, right=0.7cm of b] (c) {\textbf{dashboard/data/}\\ quelques tables Parquet\\ \textbf{versionnées}\\ (quelques Mo)};
+\node[bloc=orange, right=0.7cm of c] (d) {\textbf{app.py}\\ Dash + Plotly\\ 7 pages, filtres\\ partagés};
+\draw[fl](a)--(b); \draw[fl](b)--(c); \draw[fl](c)--(d);
+\end{tikzpicture}
+\end{center}
+
+\textbf{Choix de la technologie.} Plotly Dash : c'est l'outil présenté dans le cours EDA (« le plus puissant, pour des
+visualisations sur mesure ») et il repose sur Plotly, déjà utilisé pour l'exploration. Streamlit serait plus rapide à écrire mais moins flexible pour les graphiques liés (clic sur la
+carte $\to$ mise à jour des autres vues). Power BI et Tableau sont exclus : l'enseignant doit pouvoir relancer le code.
+
+\textbf{Arborescence prévue.}
+\begin{itemize}
+\item \texttt{dashboard/app.py} : application, navigation, filtres globaux ; \texttt{dashboard/pages/} : une vue par fichier ;
+\item \texttt{dashboard/build\_summary.py} : niveau 2/3 $\to$ \texttt{dashboard/data/*.parquet} ;
+\item \texttt{dashboard/export\_html.py} : export statique (plan B, sans interaction entre vues) ;
+\item \texttt{dashboard/README.md} : lancement en trois lignes, captures d'écran, limites ; \texttt{requirements.txt} complété (\texttt{dash}, \texttt{plotly}).
+\end{itemize}
+
+\section{Le jeu de données résumé}\label{sec:donnees}
+
+Chaque table est construite une fois, vérifiée contre les chiffres du livrable 1 (1\,599 épisodes français,
+22\,501 signalements, 99\,063 lignes de panel, 24 \% de cas positifs).
+
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{3.3cm} >{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}X}
+\rowcolor{gris!14}\entete{Table résumé} & \entete{Une ligne =} & \entete{Construite à partir de}\\
+\var{serie\_pays} & pays $\times$ mois : pénuries en cours, nouvelles, signalements & \var{shortage\_events}, \var{ansm\_signalements} \\
+\var{substances} & une substance (1\,223) : classes ATC1--4 \emph{déduites du code}, libellé, consommation, nb de présentations,
+nb de signalements, nb d'épisodes par pays, durée médiane, liste critique UE & \var{panel\_fr}, \var{consommation}, \var{atc}, \var{ue\_liste\_critique} \\
+\var{classes\_mois} & classe ATC2 $\times$ mois : part de substances touchées, nb de signalements & \var{panel\_fr} \\
+\var{episodes} & un épisode (13\,634) : substance, pays, début, fin, en cours, gravité, cause regroupée & \var{shortage\_events} \\
+\var{manquants} & variable $\times$ année : part de valeurs absentes & \var{panel\_fr} \\
+\filet
+\end{tabularx}
+
+\textbf{Deux pièges déjà repérés.}
+(1) La table \var{atc} ne couvre pas toutes les substances du panel (environ 30 \% des lignes sans classe) : nous déduirons les
+niveaux ATC1 à ATC4 du \emph{préfixe du code ATC5} (A02BA01 $\to$ A, A02, A02B, A02BA), et ne garderons le libellé que quand il existe.
+(2) Les 55 libellés de cause sont dans trois langues ; nous les regroupons à la main en cinq familles (production, demande, arrêt
+commercial, approvisionnement, autre) et publions la table de correspondance.
+
+\section{Les sept vues du dashboard}\label{sec:pages}
+
+Filtres partagés en haut de page : période, pays, classe ATC1, gravité. Un clic sur une classe de la vue 2
+filtre toutes les autres (graphiques liés, comme dans l'exemple « clic sur la carte $\to$ statistiques » du cours).
+
+\subsection*{Vue 1 --- Évolution des pénuries}
+\textbf{Graphique :} courbes des pénuries en cours (FR, IT, DE) et barres des nouvelles pénuries par mois ; en dessous, signalements ANSM
+mensuels. Curseur de période, moyenne mobile 3 mois en option, bascule « effectifs / par substance suivie ».
+Carte de saisonnalité (année $\times$ mois) des signalements. Zones grisées sans archive et repères datés (Covid, hiver 2022--2023).
+\textbf{Pourquoi :} série temporelle ; \textbf{à montrer} : la hausse tendancielle (1\,504 signalements en 2019, 4\,925 en 2023) et la saisonnalité.
+
+\subsection*{Vue 2 --- Arbre thérapeutique (ATC)}
+\textbf{Graphique :} treemap / sunburst ATC1 $\to$ ATC2 $\to$ ATC5. Taille = consommation (échelle log) ou nombre de substances ;
+couleur = part de substances ayant connu une pénurie, ou nombre de signalements. Clic = zoom + filtre global.
+\textbf{Pourquoi :} la structure est une hiérarchie, pas une liste. \textbf{À montrer} : que les pénuries se concentrent dans certaines classes (anti-infectieux, système nerveux).
+
+\subsection*{Vue 3 --- Heatmap substances $\times$ mois, lisible}
+\textbf{Graphique A :} lignes = classes ATC2 (74) ordonnées par clustering hiérarchique ou par code ATC (au choix), colonnes = 81 mois,
+couleur = part de substances à signalement dans les 3 mois (palette séquentielle, valeurs absentes en gris). Clic sur une ligne :
+liste des substances de la classe en dessous.
+\textbf{Graphique B :} matrice de corrélation de Spearman sur 8 variables seulement
+(\var{log conso}, \var{log présentations}, \var{sig\_an\_prec}, \var{ue\_critique}, \var{fr\_autres\_classe\_3m}, \var{it\_affichee\_3m}, \var{de\_affichee\_3m}, \var{cible}),
+choisies pour leur sens, triées par clustering, annotées. Spearman, car les variables sont très asymétriques ; mention
+« corrélation $\neq$ causalité » (consommation et présentations sont liées entre elles : lien confondu).
+\textbf{Pourquoi :} 1\,223 $\times$ 81 cases est illisible ; l'agrégation et le choix de variables rendent la figure utile.
+
+\subsection*{Vue 4 --- Distributions en échelle logarithmique}
+\textbf{Graphiques :} durées des pénuries par pays (histogramme en log, ECDF, boîte à moustaches ; médiane et quartiles affichés) ;
+consommation par substance en log--log et courbe rang--taille (loi de puissance) ; concentration des signalements par laboratoire
+(les 20 premiers = quelle part ?) ; causes par pays (barres horizontales, cinq familles). Bascule linéaire/log.
+\textbf{Pourquoi :} le cours EDA : « prendre le log pour tracer, ça marche mieux » ; la règle des 3 sigma est fausse sur ces données, on emploie l'IQR et on garde les valeurs extrêmes (exactes).
+
+\subsection*{Vue 5 --- Fiche substance}
+\textbf{Graphique :} recherche d'une substance (nom ou code ATC5) ; diagramme de Gantt de ses épisodes par pays (FR/IT/DE) avec le
+mois de publication ; signalements mensuels ; consommation annuelle ; badge liste critique UE ; substances voisines (même ATC4).
+\textbf{Pourquoi :} les données sont des épisodes avec début et fin ; \textbf{à montrer} : à l'échelle d'une substance, ce que Q1 (substituts) et Q2 (pays voisins) veulent capter.
+
+\subsection*{Vue 6 --- Comparer les pays}
+\textbf{Graphique :} nuage Italie vs France (nombre d'épisodes par substance, log--log, couleur = classe ATC1) ;
+petits multiples des trois pays sur la même échelle de temps ; table des substances en pénurie dans deux pays ou plus.
+Rappel visible : définition de la pénurie différente selon l'agence ; Allemagne seulement depuis 07/2024.
+\textbf{Pourquoi :} montre l'étendue et les limites de la comparaison Q2 avant de la tester.
+
+\subsection*{Vue 7 --- Qualité et couverture}
+\textbf{Graphique :} matrice des manquants (variable $\times$ année), couverture des archives (photos par pays), part d'épisodes en cours
+(11 \% FR, 27 \% DE), ATC inconnu (3 à 6 \%). \textbf{Pourquoi :} règle d'or du cours EDA, « toute donnée est pleine d'erreurs » ; l'enseignant voit ce qui est fiable.
+
+\subsection*{Option si le temps le permet --- profil des substances}
+ACP de 5 à 6 variables par substance (log consommation, présentations, nb de signalements, durée médiane, nb de pays touchés), colorée par ATC1, avec le cercle des
+corrélations. À écarter si elle ne dit rien d'utile : l'énoncé refuse la réduction de dimension « par défaut ».
+
+\section{Principes de conception}
+
+\begin{itemize}
+\item \textbf{Lisibilité d'abord} : titres qui disent la conclusion, unités et échelle (lin./log) toujours indiquées, aucun camembert, pas plus de sept couleurs catégorielles.
+\item \textbf{Palette cohérente} : celle du rapport (gris, bleu, vert, orange) ; palettes séquentielles accessibles aux daltoniens ; mode sombre non requis.
+\item \textbf{Honnêteté} : valeurs absentes grisées (jamais zéro), photos manquantes signalées, taille de l'échantillon sous chaque graphique, définitions au survol.
+\item \textbf{Sobriété} : au plus 3 graphiques par vue, une phrase « comment lire ce graphique » repliable.
+\item \textbf{Pas de fuite} : le dashboard n'affiche que des faits ; les variables du panel gardent leur définition « connu à la fin du mois ».
+\end{itemize}
+
+\section{Calendrier et répartition}
+
+La date limite du livrable n'est pas dans l'énoncé : durées en jours de travail à caler dès qu'on la connaît (marge de 2 jours
+avant le rendu). La répartition est une proposition.
+
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{0.8cm} >{\raggedright\arraybackslash}X r >{\raggedright\arraybackslash}p{2.3cm}}
+\rowcolor{gris!14}\entete{Étape} & \entete{Contenu} & \entete{Durée} & \entete{Proposé}\\
+P0 & Valider ce plan, trancher les questions du §\ref{sec:questions} ; installer \texttt{dash}/\texttt{plotly} et tester sous Python 3.14 & 0,5\,j & les deux \\
+P1 & \texttt{build\_summary.py} + tables résumé + tests de cohérence avec le livrable 1 & 1,5\,j & Ozan \\
+P2 & Squelette Dash : navigation, filtres partagés, thème, chargement rapide & 1\,j & Rahim \\
+P3 & Vues 1, 2 et 3 (le cœur : temps, ATC, heatmap) & 2,5\,j & Ozan (1, 3), Rahim (2) \\
+P4 & Vues 4, 5, 6, 7 & 2,5\,j & Rahim (4, 7), Ozan (5, 6) \\
+P5 & Graphiques liés, textes d'aide, relecture visuelle sur écran d'ordinateur et en fenêtre étroite & 1\,j & les deux \\
+P6 & Essai à blanc sur machine propre (venv neuf), README, captures d'écran, plan B HTML & 1\,j & les deux \\
+P7 & Pièces à rendre selon la consigne (code, éventuel court rapport) & 0,5\,j & les deux \\
+\filet
+\end{tabularx}
+
+Total estimé : environ 10 jours de travail à deux, soit 5 à 6 jours calendaires. Le chemin critique est P1 puis P3 ;
+P2 peut avancer en parallèle de P1 avec des données factices.
+
+\section{Critères de réussite (à cocher avant le rendu)}
+
+\begin{itemize}
+\item[$\square$] Sur un venv neuf : \texttt{pip install -r requirements.txt} puis \texttt{python dashboard/app.py} ouvre le dashboard en moins de 10\,s, sans \texttt{data/}.
+\item[$\square$] Chaque changement de filtre répond en moins de 2\,s.
+\item[$\square$] Les chiffres du dashboard égalent ceux du rapport 1 (épisodes par pays, signalements, 99\,063 lignes, 24 \% de positifs).
+\item[$\square$] Aucune vue n'affiche plus de 100 éléments illisibles ; échelles log là où la distribution l'exige.
+\item[$\square$] Chaque vue montre une information propre au dataset (pas un graphique générique) et dit comment le lire.
+\item[$\square$] Aucune erreur dans la console du serveur ni du navigateur ; testé sur macOS et dans une fenêtre étroite.
+\item[$\square$] Le plan B (export HTML) s'ouvre par double-clic.
+\item[$\square$] README du dashboard : lancement, contenu des vues, limites connues.
+\end{itemize}
+
+\section{Risques et points de vigilance}
+
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{5.0cm} >{\raggedright\arraybackslash}X}
+\rowcolor{gris!14}\entete{Risque} & \entete{Parade}\\
+Installation de Dash impossible chez l'enseignant & Plan B HTML autonome ; versions épinglées ; testé sous Python 3.11 et 3.14. \\
+Taille des fichiers versionnés & Résumés seulement (cible $<$ 20 Mo en tout) ; aucune donnée brute. \\
+Heatmap lente ou illisible & Pré-agrégation par classe ; ordre calculé une fois dans \texttt{build\_summary.py}. \\
+Courbes trompeuses : archives irrégulières, 04/2021 comme début de série & Zones grisées, légende explicite, ne jamais interpoler entre deux photos éloignées. \\
+Taux de positifs et signalements en hausse au fil des années & Afficher l'année en facette ; avertir que la comparaison entre années n'est pas à définition constante. \\
+Cohorte fondée sur la liste MITM de 2026 & Mentionné dans la vue 7 ; les substances hors liste ne sont pas représentées. \\
+Dashboard qui « répond » trop & Pas de score de risque ni de modèle : exploration seule. \\
+\filet
+\end{tabularx}
+
+\section{Questions à trancher}\label{sec:questions}
+
+\begin{enumerate}
+\item \textbf{Date et pièces du rendu} : le sujet ne parle que du dashboard ; faut-il aussi un court rapport ? (À demander à l'enseignant ou à vérifier dans la consigne du TME.)
+\item \textbf{Carte} : l'énoncé cite les cartes pour des données géographiques, or nous n'avons que trois pays, sans région ni coordonnées.
+Notre proposition : \emph{pas de carte}, et une phrase dans le README expliquant ce choix. Alternative : un petit encart Europe avec trois pays colorés, peu informatif.
+\item \textbf{Dash ou Streamlit} : recommandation Dash (cours, graphiques liés) ; Streamlit si le temps manque.
+\item \textbf{ACP optionnelle} : à garder ou non, selon le temps restant après P4.
+\item \textbf{Périmètre} : tout le dataset (FR, IT, DE) ou la France seule en détail avec IT/DE comme signaux ? Recommandation : France au centre, comme dans le projet, IT/DE dans les vues 1, 4, 5, 6.
+\end{enumerate}
+
+\section{Lien avec les cours}
+
+\begin{tabularx}{\linewidth}{>{\raggedright\arraybackslash}p{4.4cm} >{\raggedright\arraybackslash}X}
+\rowcolor{gris!14}\entete{Cours} & \entete{Utilisé pour}\\
+EDA --- distributions & Log-normale et loi de puissance, médiane/IQR plutôt que moyenne/3 sigma, boîtes et ECDF (vue 4). \\
+EDA --- bivarié, multivarié & Spearman pour variables asymétriques, mise en garde corrélation/causalité, heatmap normalisée et clustermap (vue 3). \\
+EDA --- qualité des données & Valeurs absentes (MCAR/MAR/MNAR), zéros, doublons, formats : vue 7 et cases grises. \\
+EDA --- dashboards & Dash, graphiques liés, interactions par rappels (callbacks). \\
+Construire un dataset depuis un entrepôt & Grain de chaque table résumé, vérification par réconciliation, absence de fuite temporelle. \\
+Familles de données et formats & Parquet pour les résumés, séries temporelles, arborescence de projet, couche brute en lecture seule. \\
+Protocoles ML (I et II) & Hors livrable 2 ; ils reviennent avec le rapport final (découpage temporel, métriques). \\
+\filet
+\end{tabularx}
+
+\end{document}

@@ -25,6 +25,7 @@ GRAINS = {
     "produits": ["cis"],
     "atc": ["atc5"],
     "consommation": ["atc5", "annee"],
+    "consommation_mensuelle": ["atc5", "mois"],
     "cip_atc": ["cip13"],
     "ansm_fiches": ["fiche"],
     "ansm_episodes": ["fiche", "numero_episode"],
@@ -36,7 +37,7 @@ GRAINS = {
     "bdpm_presentations_historique": ["cip13", "valid_from"],
     "bdpm_generiques_historique": ["groupe_generique", "cis", "valid_from"],
 }
-TABLES_ATC5 = ["produits", "ansm_fiches", "ansm_signalements", "shortage_events", "penuries_fr_mensuel",
+TABLES_ATC5 = ["consommation_mensuelle", "produits", "ansm_fiches", "ansm_signalements", "shortage_events", "penuries_fr_mensuel",
                "ue_liste_critique"]
 HISTORISEES = {"bdpm_specialites_historique": ["cis"], "bdpm_presentations_historique": ["cip13"],
                "bdpm_generiques_historique": ["groupe_generique", "cis"]}
@@ -94,6 +95,41 @@ def controler_reconciliation():
         yield f"part sans ATC5 dans {table} : {part:.1%} (seuil {seuil:.0%})", part <= seuil, f"{part:.1%}"
 
 
+def controler_medicam():
+    """Consommation mensuelle (Medic'AM) : mois continus, réconciliation avec les fichiers annuels et
+    avec Open Medic, part des boîtes sans ATC5 mesurée (cours : troncature, clés non résolues)."""
+    mensuelle = lire("consommation_mensuelle")
+    attendus = pd.date_range(mensuelle["mois"].min(), mensuelle["mois"].max(), freq="MS")
+    manquants = attendus.difference(mensuelle["mois"].unique())
+    yield "aucun mois manquant dans consommation_mensuelle", len(manquants) == 0, f"manquants : {list(manquants.strftime('%Y-%m'))}"
+    negatives = (mensuelle["boites"] < 0).sum()
+    yield "boîtes négatives rares (régularisations)", negatives < 0.001 * len(mensuelle), f"{negatives} lignes sur {len(mensuelle)}"
+
+    # Les fichiers annuels et semestriels viennent de la même source mais ne coïncident pas toujours
+    # (2016 : -2,6 %, 2018 : +0,5 %, révisions de la source) : l'écart est borné, pas supprimé.
+    rapprochement = lire("medicam_reconciliation")
+    ecart = (rapprochement["boites_mensuel"] / rapprochement["boites_annuel"] - 1).abs()
+    yield ("somme des 12 mois = fichier annuel (écart max 3 %)", ecart.max() <= 0.03,
+           f"écart max {ecart.max():.1%} en {int(rapprochement.loc[ecart.idxmax(), 'annee'])}")
+    yield "12 mois présents chaque année annuelle", (rapprochement["mois_presents"] == 12).all(), \
+        f"{rapprochement['mois_presents'].tolist()}"
+
+    # Boîtes sans ATC5 valide : environ 6 % avant 2021, moins de 2 % ensuite.
+    nc = lire("medicam_non_classe")
+    part = nc["boites_non_classees"] / nc["boites_total"]
+    yield (f"part de boîtes sans ATC5 : max {part.max():.1%} (seuil 15 %)", part.max() <= 0.15, f"{part.max():.1%}")
+    recent = part[nc["mois"] >= "2021-01-01"].max()
+    yield f"part de boîtes sans ATC5 depuis 2021 : max {recent:.1%} (seuil 3 %)", recent <= 0.03, f"{recent:.1%}"
+
+    # Même champ qu'Open Medic (ville, remboursé) : les totaux annuels coïncident à 2 % près.
+    annuel = (mensuelle.assign(annee=mensuelle["mois"].dt.year).groupby("annee")["boites"].sum()
+              .rename("mensuel").to_frame().join(lire("consommation").groupby("annee")["boites"].sum().rename("open_medic"),
+                                                 how="inner"))
+    rapport = (annuel["mensuel"] / annuel["open_medic"] - 1).abs()
+    yield (f"total annuel Medic'AM = Open Medic (écart max {rapport.max():.1%}, seuil 2 %)", rapport.max() <= 0.02,
+           f"{rapport.max():.1%}")
+
+
 def controler_dates():
     """Dates de connaissance (fuite temporelle) : chaque épisode a une date de publication, et
     chaque épisode terminé une date à laquelle sa fin est connue, jamais avant sa publication."""
@@ -119,7 +155,7 @@ def garder_le_manifeste():
 
 def construire():
     for controles in (controler_grains, controler_atc5, controler_intervalles, controler_reconciliation,
-                      controler_dates):
+                      controler_medicam, controler_dates):
         for nom, reussi, detail in controles():
             if not reussi:
                 raise SystemExit(f"Contrôle en échec : {nom} — {detail}")

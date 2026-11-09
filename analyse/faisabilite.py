@@ -7,7 +7,8 @@ Usage :
 Trois questions avant toute modélisation :
 - la cible est-elle observable, avec assez de cas positifs, et comment évolue-t-elle ? ;
 - Q1 (cascade) : combien de lignes sont exposées à une pénurie affichée dans la même classe ATC4 ? ;
-- Q2 (importation) : combien de lignes sont exposées à une pénurie affichée en Italie, en Allemagne ?
+- Q2 (importation) : combien de lignes sont exposées à une pénurie affichée en Italie ? (l'Allemagne n'a que 13 mois
+  d'archives : hors du panel complet)
 Les taux avec et sans exposition sont des repères bruts, pas des résultats : ils ne tiennent pas compte
 de la taille des classes, de la consommation ni de la hausse générale des signalements.
 """
@@ -20,7 +21,6 @@ PANEL = Path(__file__).resolve().parent.parent / "data" / "final" / "panel_fr.pa
 EXPOSITIONS = {  # nom : (colonne, exposée si)
     "Q1 cascade : autres substances de la classe affichées": ("fr_autres_classe_3m", lambda x: x > 0),
     "Q2 Italie : même substance affichée": ("it_affichee_3m", lambda x: x > 0),
-    "Q2 Allemagne : même substance affichée": ("de_affichee_3m", lambda x: x > 0),
     "Contrôle : même substance affichée en France": ("fr_affichee_3m", lambda x: x > 0),
 }
 
@@ -44,8 +44,8 @@ def calculer():
 
 def facteurs():
     """Q1 et Q2 contrôlées : régression logistique entraînée sur la période d'entraînement, évaluée sur le test (2025),
-    avec les variables de base (consommation, présentations, signalements passés, liste critique, substance déjà
-    affichée) puis avec la variable de Q1 ou de Q2. Un écart d'AUC dit ce que le signal apporte de plus."""
+    avec les variables de base (consommation, tendance et saison de la demande, signalements des années publiées,
+    liste critique, substance déjà affichée) puis avec la variable de Q1 ou de Q2. Un écart d'AUC dit ce que le signal apporte de plus."""
     import numpy as np
     from sklearn.linear_model import LogisticRegression
     from sklearn.metrics import average_precision_score, roc_auc_score
@@ -54,14 +54,12 @@ def facteurs():
 
     t = pd.read_parquet(PANEL)
     t = t[t["jeu"] != "ecart"].copy()
-    for entree, sortie in [("conso_boites_an_prec", "conso"), ("conso_presentations_an_prec", "presentations"),
-                           ("sig_an_prec", "sig"), ("sig_cumul_avant", "sig_cumul")]:
+    for entree, sortie in [("conso_6m_pub", "conso"), ("sig_annee_pub", "sig"), ("sig_cumul_pub", "sig_cumul")]:
         t[sortie] = np.log1p(t[entree].astype("float64"))
-    t["conso_absente"] = t["conso"].isna().astype(int)
-    t[["conso", "presentations"]] = t[["conso", "presentations"]].fillna(0)
+    t["tendance"], t["saison"] = np.log(t["conso_tendance_6m"].astype("float64")), np.log(t["conso_saison_cible"].astype("float64"))
     for c in ["fr_affichee_3m", "fr_autres_classe_3m", "it_affichee_3m"]:
         t[c] = t[c].astype("float64")
-    base = ["conso", "presentations", "conso_absente", "ue_critique", "sig", "sig_cumul", "fr_affichee_3m"]
+    base = ["conso", "tendance", "saison", "ue_critique", "sig", "sig_cumul", "fr_affichee_3m"]
 
     def auc(donnees, colonnes):
         entrainement, test = (donnees[donnees["jeu"] == j] for j in ("entrainement", "test"))
@@ -70,9 +68,8 @@ def facteurs():
         return {"auc": float(roc_auc_score(test["cible"], p)), "pr_auc": float(average_precision_score(test["cible"], p)),
                 "coef": dict(zip(colonnes, modele[-1].coef_[0]))}
 
-    france, italie = t.dropna(subset=["fr_affichee_3m"]), t.dropna(subset=["it_affichee_3m"])
-    return {"Q1 sans": auc(france, base), "Q1 avec": auc(france, base + ["fr_autres_classe_3m"]),
-            "Q2 Italie sans": auc(italie, base), "Q2 Italie avec": auc(italie, base + ["it_affichee_3m"])}
+    return {"Q1 sans": auc(t, base), "Q1 avec": auc(t, base + ["fr_autres_classe_3m"]),
+            "Q2 Italie sans": auc(t, base), "Q2 Italie avec": auc(t, base + ["it_affichee_3m"])}
 
 
 def pct(x):

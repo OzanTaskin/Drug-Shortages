@@ -30,7 +30,8 @@ qui ne sont jamais en pénurie. L'Italie et l'Allemagne servent de signaux. Dét
 | Niveau 1 : collecte des sources brutes | ✅ 289 fichiers, environ 500 Mo, empreintes vérifiées |
 | Niveau 2 : tables nettoyées | ✅ 22 tables, dont `shortage_events` (16 769 épisodes FR/IT/DE) et `ansm_signalements` (22 501 signalements 2019-2025) ; 34 contrôles automatiques |
 | Livrable 1 : rapport de 2 pages | ✅ `Rapport-DALAS-Deliverable1/` |
-| Niveau 3 : table d'entraînement `panel_fr` | ✅ 99 063 lignes (1 223 substances × 81 mois), cible, 11 variables, découpage temporel ; 9 contrôles ; voir [EXPLICATIONS.md](EXPLICATIONS.md), section 6 |
+| Consommation mensuelle (Medic'AM) | ✅ `consommation_mensuelle` : 1 560 substances × 138 mois (01/2015 à 06/2026) ; 3 variables dans `panel_fr` |
+| Niveau 3 : table d'entraînement `panel_fr` | ✅ **complète, sans valeur vide** : 40 710 lignes (885 substances délivrées en ville × 46 mois, 12/2021 à 09/2025), cible, 14 variables, découpage temporel ; contrôles anti-fuite (recalcul, perturbation) ; voir [EXPLICATIONS.md](EXPLICATIONS.md), section 6 |
 | TME6 : dashboard | ⏳ |
 | TME9 : rapport final | ⏳ |
 
@@ -71,6 +72,7 @@ collecte/                 niveau 1
 ├── sources_actuelles.py  photo du jour : BDPM, ANSM, AIFA, BfArM, liste critique de l'UE
 ├── ansm_signalements.py  signalements de rupture, un classeur par an (2019-2025)
 ├── open_medic.py         consommation 2019-2025
+├── medicam.py            consommation mensuelle 2015 à 06/2026 (Medic'AM)
 ├── wayback.py            archives mensuelles de la Wayback Machine
 └── verification.py       empreintes de la couche brute conformes au manifeste
 
@@ -80,6 +82,7 @@ nettoyage/                niveau 2 : une étape par fichier, lancées dans l'ord
 ├── bdpm_historique.py    archives BDPM → bdpm_*_historique (versions datées)
 ├── ue_liste_critique.py  liste critique de l'UE
 ├── open_medic.py         → atc, cip_atc, consommation
+├── medicam.py            → consommation_mensuelle (ATC5 × mois) et ses contrôles
 ├── produits.py           ATC5 de chaque médicament français
 ├── ansm.py               page ANSM → ansm_observations
 ├── ansm_fiches.py        chaque fiche ANSM reliée à un médicament et un ATC5

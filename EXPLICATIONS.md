@@ -342,6 +342,15 @@ virgule flottante, précision des dates selon la version de pandas) a été corr
 
 ## 6. La table d'entraînement (niveau 3, construite) et la suite
 
+> **Mise à jour du 09/11/2026 : panel complet.** Le panel décrit ci-dessous (99 063 lignes) a été refait. Il compte
+> désormais **40 710 lignes sans aucune valeur vide** : 885 substances délivrées en ville × 46 mois (12/2021 à 09/2025).
+> Trois choix l'ont permis : la période commence quand la France et l'Italie sont couvertes ; l'Allemagne (13 mois
+> d'archives) et les 338 substances réservées à l'hôpital (consommation inconnue) sortent du panel. La consommation
+> annuelle d'Open Medic et les signalements de l'année précédente lisaient des années pas encore publiées (29 % et 26 %
+> des lignes) : ils sont remplacés par des variables qui ne lisent que ce qui était publié à la fin du mois t
+> (consommation mensuelle Medic'AM, dernière année de signalements publiée). Voir `nettoyage/panel.py` pour les règles
+> et les contrôles. Le détail ci-dessous décrit la première version.
+
 **État** : les étapes 1 à 5 ci-dessous sont faites dans `nettoyage/panel.py` (`python -m nettoyage panel`, résultat dans
 `data/final/panel_fr.parquet`, manifeste dans `manifestes/niveau3_<date>.json`). Écarts avec le plan : le mois *t* est
 le mois de prédiction, avec les informations connues à sa fin, et la cible regarde *t*+1 à *t*+3 (81 mois, 01/2019 à
