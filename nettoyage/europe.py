@@ -1,4 +1,5 @@
-"""Italie (AIFA), Allemagne (BfArM) et Norvège (DMP) → `europe_observations` et `europe_episodes`.
+"""Italie (AIFA), Allemagne (BfArM), Norvège (DMP), Suède (Läkemedelsverket), Tchéquie (SÚKL)
+→ `europe_observations` et `europe_episodes`.
 
 Ces listes servent de signaux européens (question 2). Chaque photo (archives Wayback + photo du
 jour) donne les pénuries publiées à cette date.
@@ -41,6 +42,25 @@ de déclaration ; un même épisode est repris d'un classeur à l'autre tant qu'
 - médicaments vétérinaires écartés (ATC en Q, ou « Legemiddel til dyr ») ; retraits du marché
   (cause « avregistrering ») : `type_episode` = « arret_definitif » ;
 - ATC absent du classeur 2019 : repris du même numéro de boîte, sinon de la même substance.
+
+Suède et Tchéquie : des registres complets, pas des photos ; ils ne passent pas par `europe_observations`
+(pas d'observations répétées) et donnent directement leurs épisodes.
+- Suède : une interruption de vente déclarée = un épisode (MedicineShortageId), dans le fichier « en cours »
+  ou « historique » (terminées). `publication` = date de première publication par l'agence ; `debut` = début
+  prévu le plus ancien de ses boîtes ; `fin` = fin réelle la plus tardive (vide si une boîte n'a pas de fin
+  réelle : en cours) ; `fin_au_plus_tard` (→ `fin_connue_le`) = dernière mise à jour de la fiche, au moins la
+  fin réelle (prudent : la fin est connue au plus tard à cette date). Arrêt définitif (CESSATION) :
+  `type_episode` = « arret_definitif ». ATC : le plus fréquent parmi les produits de la fiche. Environ 1 000
+  fiches ont une fin réelle avant leur début prévu : pénurie annoncée puis évitée ou annulée (gardées, comme
+  en Italie).
+- Tchéquie : déclarations d'interruption, de reprise et d'arrêt de chaque produit (code SÚKL), depuis 2018.
+  Une interruption ouvre un épisode ; la reprise suivante du même produit le ferme (`fin` = date d'effet de la
+  reprise, `fin_au_plus_tard` = la plus tardive de sa date d'effet et de sa date de déclaration) ; un arrêt
+  le ferme aussi (une interruption déclarée en retard, après sa reprise, n'a sa fin connue qu'à sa
+  publication). Une nouvelle interruption alors qu'un épisode est ouvert le prolonge. Sans reprise
+  déclarée, l'épisode reste `en_cours` (les reprises ne sont pas toujours déclarées : durée à lire avec
+  prudence). Les arrêts seuls sont des épisodes `arret_definitif`. `publication` = date de déclaration (le
+  Market report est mis à jour en continu) ; `debut` = date d'effet de l'interruption.
 """
 import io
 import re
@@ -207,6 +227,94 @@ def episodes_norvegiens(observations):
     return episodes.drop(columns="statut")
 
 
+NS_SUEDE = "{http://eservices.lakemedelsverket.se/opendata/medicineshortage/v3/}"
+
+
+def episodes_suedois():
+    import xml.etree.ElementTree as ET
+
+    dossier = RAW / "lakemedelsverket"
+    jour = max(f.name[:10] for f in dossier.glob("*.xml"))  # photo du dernier jour de collecte
+    lignes = []
+    for chemin in sorted(dossier.glob(f"{jour}_*.xml")):
+        for fiche in ET.parse(chemin).getroot().iter(NS_SUEDE + "MedicineShortage"):
+            texte = lambda balise: (fiche.findtext(NS_SUEDE + balise) or "").strip() or None
+            dates = lambda balise: [e.text for e in fiche.iter(NS_SUEDE + balise) if e.text]
+            produits = fiche.findall(f".//{NS_SUEDE}MedicinalProduct")
+            atcs = pd.Series([atc5_valide(p.findtext(NS_SUEDE + "ATC")) for p in produits]).dropna()
+            boites = fiche.findall(f".//{NS_SUEDE}PackagedMedicinalProduct")
+            fins = dates("ActualEndDate")
+            lignes.append({
+                "pays": "SE", "id_episode": texte("MedicineShortageId"),
+                "medicament": produits[0].findtext(NS_SUEDE + "ProductName") if produits else None,
+                "substance": (produits[0].findtext(NS_SUEDE + "ActiveSubstances") or "").lower() if produits else None,
+                "atc5": atcs.mode().iloc[0] if len(atcs) else None, "nb_produits": max(len(boites), 1),
+                "debut": min(dates("ForecastedStartDate"), default=None),
+                "fin_prevue": max(dates("ForecastedEndDate"), default=None),
+                "fin": max(fins) if fins and len(fins) >= len(boites) else None,
+                "publication": texte("DateOfFirstPublication") or texte("DateOfFirstNotification"),
+                "mise_a_jour": texte("LastUpdated"), "raison": texte("CauseOfShortageCategory"),
+                "type_episode": "arret_definitif" if texte("TypeOfShortage") == "CESSATION" else "penurie",
+            })
+    episodes = pd.DataFrame(lignes).drop_duplicates("id_episode", keep="last")
+    for colonne in ("debut", "fin_prevue", "fin", "publication", "mise_a_jour"):
+        episodes[colonne] = pd.to_datetime(episodes[colonne], errors="coerce")
+    episodes["en_cours"] = episodes["fin"].isna()
+    episodes["fin_au_plus_tard"] = episodes[["fin", "mise_a_jour"]].max(axis=1).where(~episodes["en_cours"])
+    episodes["debut_declare_initial"] = episodes["debut"]
+    episodes["premiere_photo"], episodes["derniere_photo"] = episodes["publication"], episodes["mise_a_jour"]
+    episodes["criticite"] = None
+    return episodes.drop(columns="mise_a_jour")
+
+
+def episodes_tcheques():
+    import json
+
+    dossier = RAW / "sukl"
+    jour = max(d.name for d in dossier.iterdir() if d.is_dir())
+    declarations = pd.DataFrame([d for chemin in sorted((dossier / jour).glob("*.json"))
+                                 for d in json.loads(chemin.read_bytes())["data"]]).drop_duplicates("id")
+    declarations = pd.DataFrame({
+        "id": declarations["id"], "produit": declarations["kodSUKL"].astype(str),
+        "type": declarations["typOmezeni"].map(lambda t: t["def"]),
+        "medicament": (declarations["nazevLP"].fillna("") + " " + declarations["doplnekLP"].fillna("")).str.strip(),
+        "substance": declarations["atcNazev"].str.lower(), "atc5": declarations["atc"].map(atc5_valide),
+        "effet": pd.to_datetime(declarations["platOd"].str[:10], errors="coerce"),
+        "declaration": pd.to_datetime(declarations["datumHlaseni"], errors="coerce"),
+        "reprise_prevue": pd.to_datetime(declarations["terminObnovy"], format="%d.%m.%Y", errors="coerce"),
+        "raison": declarations["duvodPreruseni"].map(lambda r: (r or {}).get("en") or None),
+    }).dropna(subset=["effet", "declaration"]).sort_values(["produit", "effet", "declaration", "id"])
+
+    episodes, ouverts = [], {}
+    def fermer(produit, fin, connue):
+        e = ouverts.pop(produit)
+        # Interruption déclarée en retard, après sa reprise : la fin n'est connue qu'à la publication.
+        e.update(fin=fin, fin_au_plus_tard=max(connue, e["publication"]), en_cours=False)
+        episodes.append(e)
+    for d in declarations.itertuples():
+        if d.type == "preruseni":
+            if d.produit in ouverts:  # nouvelle interruption pendant un épisode ouvert : il continue
+                ouverts[d.produit].update(fin_prevue=d.reprise_prevue, derniere_photo=d.declaration)
+                continue
+            ouverts[d.produit] = {"pays": "CZ", "id_episode": f"{d.produit}_{d.id}", "medicament": d.medicament,
+                                  "substance": d.substance, "atc5": d.atc5, "nb_produits": 1, "debut": d.effet,
+                                  "debut_declare_initial": d.effet, "fin_prevue": d.reprise_prevue,
+                                  "premiere_photo": d.declaration, "derniere_photo": d.declaration,
+                                  "publication": d.declaration, "raison": d.raison, "criticite": None,
+                                  "type_episode": "penurie", "fin": pd.NaT, "fin_au_plus_tard": pd.NaT, "en_cours": True}
+        elif d.produit in ouverts:  # reprise ou arrêt : l'épisode ouvert se ferme
+            fermer(d.produit, d.effet, max(d.effet, d.declaration))
+        elif d.type == "ukonceni":
+            episodes.append({"pays": "CZ", "id_episode": f"{d.produit}_{d.id}", "medicament": d.medicament,
+                             "substance": d.substance, "atc5": d.atc5, "nb_produits": 1, "debut": d.effet,
+                             "debut_declare_initial": d.effet, "fin_prevue": pd.NaT, "premiere_photo": d.declaration,
+                             "derniere_photo": d.declaration, "publication": d.declaration, "raison": d.raison,
+                             "criticite": None, "type_episode": "arret_definitif", "fin": d.effet,
+                             "fin_au_plus_tard": max(d.effet, d.declaration), "en_cours": False})
+    episodes += list(ouverts.values())
+    return pd.DataFrame(episodes)
+
+
 def episodes_italiens(observations):
     """Identifiant d'épisode italien : AIC + mois de la première photo d'une présence continue.
 
@@ -288,7 +396,8 @@ def construire():
     episodes["fin_au_plus_tard"] = [photo_suivante.get((pays, fin)) if pd.notna(fin) else pd.NaT
                                     for pays, fin in zip(episodes["pays"], episodes["fin"])]
     episodes["fin_au_plus_tard"] = pd.to_datetime(episodes["fin_au_plus_tard"])
-    episodes = pd.concat([episodes, norvege[episodes.columns]], ignore_index=True)
+    episodes = pd.concat([episodes, norvege[episodes.columns], episodes_suedois()[episodes.columns],
+                          episodes_tcheques()[episodes.columns]], ignore_index=True)
     enregistrer(episodes, "europe_episodes")
     for pays, groupe in episodes.groupby("pays"):
         print(f"  {pays} : {len(groupe)} épisodes, ATC5 connu pour {groupe['atc5'].notna().mean():.0%}")

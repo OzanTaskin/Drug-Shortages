@@ -1,6 +1,6 @@
 {
  "panel_fr": {
-  "construite_le": "2026-11-09T13:13:21",
+  "construite_le": "2026-11-09T14:19:00",
   "lignes": 58410,
   "colonnes": [
    "atc5",
@@ -15,6 +15,8 @@
    "it_affichee_3m",
    "no_couvert",
    "no_nouvelle_3m",
+   "se_nouvelle_3m",
+   "cz_nouvelle_3m",
    "sig_annee_pub",
    "sig_cumul_pub",
    "conso_6m_pub",
@@ -33,6 +35,8 @@
    "it_affichee_3m": 15941.0,
    "no_couvert": 45135.0,
    "no_nouvelle_3m": 4834.0,
+   "se_nouvelle_3m": 9020.0,
+   "cz_nouvelle_3m": 9470.0,
    "sig_annee_pub": 175812.0,
    "sig_cumul_pub": 469692.0,
    "conso_6m_pub": 62081487462.0,
@@ -40,9 +44,9 @@
    "conso_saison_cible": 60668.93,
    "ue_critique": 3380.0
   },
-  "empreinte_contenu": "052bf5ccf4758914",
-  "commit": "05b5ccd+modifs",
-  "empreinte_code": "d2a137802c0c7973",
-  "empreinte_brut": "15b1a9159c9ccaf6"
+  "empreinte_contenu": "df3c6dc551194c78",
+  "commit": "f514ef1+modifs",
+  "empreinte_code": "6659c532ab04c3ec",
+  "empreinte_brut": "fcf238171d94f884"
  }
 }

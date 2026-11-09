@@ -1,5 +1,5 @@
 """`shortage_events` : la table centrale du niveau 2. Une ligne = un épisode de pénurie,
-dans un pays, au même format pour la France, l'Italie, l'Allemagne et la Norvège.
+dans un pays, au même format pour la France, l'Italie, l'Allemagne, la Norvège, la Suède et la Tchéquie.
 
 Colonnes communes :
     pays, id_episode, medicament, substance, atc5, atc4, debut, fin, en_cours,
@@ -14,9 +14,9 @@ Colonnes communes :
     durées, comme `en_cours`),
     fin_connue_le (photo où l'on voit que l'épisode est terminé : `fin` ne peut servir à une date d
     que si fin_connue_le < d, voir `ansm_episodes.py`)
-La France vient de `ansm_episodes`, l'Italie, l'Allemagne et la Norvège de `europe_episodes`.
-Norvège : registre et non photos ; un épisode n'est censuré à gauche que s'il a été déclaré avant 2019
-(premier classeur collecté).
+La France vient de `ansm_episodes`, les autres pays de `europe_episodes`.
+Norvège, Suède, Tchéquie : registres et non photos ; un épisode n'est censuré à gauche que s'il a été publié
+avant le début collecté (2019 pour la Norvège, 2018 pour les deux autres).
 
 Types : les colonnes à peu de valeurs distinctes sont en dtype `category` (une valeur stockée une
 fois, un petit code par ligne) ; la gravité est une catégorie ordonnée.
@@ -30,7 +30,8 @@ COLONNES = ["pays", "id_episode", "medicament", "substance", "atc5", "atc4", "de
             "en_cours", "type_episode", "gravite", "criticite", "raison", "debut_connu", "publication",
             "censure_gauche", "censure_droite", "fin_connue_le"]
 DATES = ["debut", "fin", "publication", "fin_connue_le"]
-DEBUT_REGISTRE_NORVEGIEN = pd.Timestamp("2019-01-01")
+# Registres (et non photos) : un épisode n'est censuré à gauche que s'il a été publié avant le début collecté.
+DEBUT_REGISTRES = {"NO": pd.Timestamp("2019-01-01"), "SE": pd.Timestamp("2018-01-01"), "CZ": pd.Timestamp("2018-01-01")}
 CATEGORIES = {"pays": None, "type_episode": None, "criticite": None,
               "gravite": pd.CategoricalDtype(list(GRAVITE), ordered=True)}
 
@@ -52,8 +53,9 @@ def construire():
     europe = europe.assign(gravite=None, debut_connu=True, censure_droite=False,
                            censure_gauche=europe["premiere_photo"] == premiere_photo_du_pays,
                            fin_connue_le=europe["fin_au_plus_tard"])
-    norvege = europe["pays"] == "NO"
-    europe.loc[norvege, "censure_gauche"] = europe.loc[norvege, "publication"] < DEBUT_REGISTRE_NORVEGIEN
+    for pays, debut in DEBUT_REGISTRES.items():
+        registre = europe["pays"] == pays
+        europe.loc[registre, "censure_gauche"] = europe.loc[registre, "publication"] < debut
 
     evenements = pd.concat([france, europe], ignore_index=True)
     evenements["atc4"] = evenements["atc5"].str[:5]

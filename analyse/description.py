@@ -38,6 +38,9 @@ def calculer():
     photos = {"FR": lire("ansm_observations")["date_photo"],
               "IT": europe[europe["pays"] == "IT"]["date_photo"], "DE": europe[europe["pays"] == "DE"]["date_photo"],
               "NO": europe[europe["pays"] == "NO"]["date_photo"]}  # Norvège : un classeur annuel par « photo »
+    # Suède, Tchéquie : registres sans photos ; la « période » est celle des publications.
+    for pays in ("SE", "CZ"):
+        photos[pays] = evenements.loc[evenements["pays"] == pays, "publication"]
     resultat["pays"] = {}
     for pays, g in penuries.groupby("pays", observed=True):
         p = photos[pays]

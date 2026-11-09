@@ -68,6 +68,8 @@ Toutes sont publiques et officielles, collectées par `python -m collecte` (05/1
 |---|---|
 | **AIFA** (Italie, CSV) | environ 2 500 pénuries, avec code ATC, dates, raison et équivalents |
 | **BfArM** (Allemagne, CSV) | 963 déclarations, avec ATC, dates et **raison** de la pénurie |
+| **Läkemedelsverket** (Suède, XML ouverts, en cours + historique) | interruptions de vente depuis 2018, avec **date de publication**, début, fin réelle, cause, ATC (91 %) |
+| **SÚKL** (Tchéquie, « Market report », interface JSON) | déclarations d'interruption, de reprise et d'arrêt depuis 2018 (2009 dans la source), avec **date de déclaration**, date d'effet, reprise prévue, ATC |
 | **DMP** (Norvège, XLSX annuels, via la Wayback Machine) | registre des pénuries 2019 → 12/07/2024 : 6 499 épisodes, avec **date de déclaration**, période, cause, statut, ATC (97 %) |
 | **Liste critique de l'UE** (EMA, XLSX) | 299 substances critiques, avec code ATC5 et **date d'inscription** (12/2023 → 2025) |
 
@@ -75,11 +77,19 @@ Toutes sont publiques et officielles, collectées par `python -m collecte` (05/1
 l'EMA n'apportaient rien. Collectées au début, elles ont été retirées le 15/10/2026. Seule la liste
 critique de l'UE a été gardée, parce que sa date d'inscription la rend utilisable sans fuite.
 
-**Pays examinés le 09/11/2026.** Norvège retenue (ci-dessus). Finlande (Fimea) : fichier ouvert, mais pénuries
-en cours seulement, sans ATC, et 4 archives depuis 11/2024. Suède, Tchéquie : données ouvertes à l'état du jour,
-historique consultable en ligne seulement, rien d'archivé. Autriche, Belgique, Pays-Bas, Suisse, Portugal : aucun
-fichier de pénuries archivé trouvé ; Espagne et Irlande non vérifiées (archive indisponible). Allemagne : la page
-web du BfArM est archivée depuis 2021, mais ses données sont chargées par JavaScript et absentes des captures.
+**Pays examinés le 09/11/2026.** Retenus : Norvège, Suède et Tchéquie (ci-dessus), les seuls registres trouvés
+avec un historique complet, une date de publication et l'ATC. Écartés :
+- Finlande (Fimea) : fichier ouvert, mais pénuries en cours seulement, sans ATC, 4 archives depuis 11/2024 ;
+- Espagne (CIMA) : l'interface ne donne que les problèmes en cours (921), la page publique archivée est vide
+  (données chargées par JavaScript) ;
+- Autriche (BASG) : registre en cours seulement (561 fiches, presque toutes de 2025-2026) ; l'interface de
+  données exige un jeton interne au site ;
+- Belgique (PharmaStatus), Pays-Bas (Farmanco), Suisse, Portugal, Grèce : pas d'export historique trouvé ;
+- Irlande (HPRA) : liste archivée de 2019 à 01/2023 (environ 90 pénuries par photo, sans ATC) : possible plus
+  tard, apport faible ;
+- Allemagne : la page web du BfArM est archivée depuis 2021, mais ses données sont chargées par JavaScript ;
+- agrégateurs : ShortageWatch (CSV du jour seulement, historique payant), Mobidoctor (accès refusé), EDJNet
+  (22 107 pénuries 2018-2023, pas de téléchargement) : non utilisables comme source historique.
 
 ### L'historique : les archives de la Wayback Machine (`wayback/`)
 
@@ -358,6 +368,10 @@ virgule flottante, précision des dates selon la version de pandas) a été corr
 > signal vaut 0 hors couverture et `it_couvert` / `no_couvert` disent quand. Entraînement 04/2020 → 09/2023
 > (37 170 lignes, 28,9 % de positifs). Régression logistique : AUC test 0,856 sans Q2, 0,860 avec l'Italie ;
 > Norvège évaluée sur la validation couverte (01-06/2024) : 0,839 sans, 0,840 avec.
+> Suède (`se_nouvelle_3m`) et Tchéquie (`cz_nouvelle_3m`), couvertes sur toute la période, ajoutées ensuite :
+> 20 colonnes ; AUC test 0,857 avec la Suède, 0,857 avec la Tchéquie, 0,861 avec tous les pays (0,856 sans). Une
+> nouvelle déclaration en Suède ou en Tchéquie double presque le taux de positifs bruts (58 et 60 % contre 26 et
+> 25 %), mais l'historique de la substance en France l'explique déjà presque entièrement.
 >
 > **Mise à jour du 09/11/2026 : panel complet.** Le panel décrit ci-dessous (99 063 lignes) a été refait. Il compte
 > désormais **40 710 lignes sans aucune valeur vide** : 885 substances délivrées en ville × 46 mois (12/2021 à 09/2025).
@@ -434,6 +448,9 @@ Le plan suit l'ordre imposé par le cours 1 (diapos 53 à 63).
 - L'ancien et le nouveau site de l'ANSM ne partagent pas d'identifiant de fiche : une pénurie en cours en 04/2021
   devient deux épisodes (le premier `censure_droite`, le second `censure_gauche`). 20 % des fiches de l'ancien site
   restent sans ATC (médicaments retirés depuis).
+- Suède et Tchéquie : registres lus à leur état du jour de collecte (une correction faite après coup sur une
+  fiche ancienne y est déjà) ; les reprises tchèques ne sont pas toujours déclarées (épisodes sans fin) ;
+  environ 1 000 fiches suédoises ont une fin réelle avant leur début prévu (pénurie évitée ou annulée).
 - Norvège : on suppose la pénurie publiée le jour de sa déclaration ; sa fin n'est connue qu'au classeur annuel
   suivant, d'où un signal limité aux nouvelles déclarations ; rien après 07/2024 (pas de signal pour le test 2025).
 - Les définitions de « pénurie » diffèrent entre pays : les signaux européens sont des indicateurs, pas des
