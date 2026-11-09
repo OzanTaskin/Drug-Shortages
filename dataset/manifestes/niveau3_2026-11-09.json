@@ -1,6 +1,6 @@
 {
  "panel_fr": {
-  "construite_le": "2026-11-09T14:49:04",
+  "construite_le": "2026-11-09T15:44:35",
   "lignes": 58410,
   "colonnes": [
    "atc5",
@@ -55,7 +55,7 @@
    "ue_critique": 3380.0
   },
   "empreinte_contenu": "8574a072e4dbd9e8",
-  "commit": "e40dd46+modifs",
+  "commit": "bb57e3f+modifs",
   "empreinte_code": "26ff32122d5fe7a6",
   "empreinte_brut": "131812ae7eb3cbfe"
  }

@@ -1,4 +1,4 @@
-# Données : trop lourdes pour GitHub (483 Mo), régénérées par `python -m collecte`
+# Données (dataset/data/) : trop lourdes pour GitHub (environ 870 Mo), régénérées par `python -m collecte`
 data/
 
 # Environnement Python

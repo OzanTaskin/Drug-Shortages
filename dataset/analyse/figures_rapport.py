@@ -1,4 +1,4 @@
-"""Figures du rapport du livrable 1 (Rapport-DALAS-Deliverable1/figures/*.pdf), à partir de data/clean.
+"""Figures du rapport du livrable 1 (livrables/livrable1/figures/*.pdf), à partir de data/clean.
 
 Usage :
     python -m analyse.figures_rapport
@@ -19,7 +19,7 @@ from analyse.description import durees_france
 
 RACINE = Path(__file__).resolve().parent.parent
 CLEAN = RACINE / "data" / "clean"
-SORTIE = RACINE / "Rapport-DALAS-Deliverable1" / "figures"
+SORTIE = RACINE.parent / "livrables" / "livrable1" / "figures"  # RACINE = dataset/
 
 COULEURS = {"FR": "#2a78d6", "IT": "#eb6834", "DE": "#1baf7a"}
 NOMS = {"FR": "France (ANSM)", "IT": "Italie (AIFA)", "DE": "Allemagne (BfArM)"}
@@ -138,7 +138,7 @@ def main():
     figure_evolution()
     figure_durees(evenements)
     figure_classes(evenements, atc)
-    print(f"Figures écrites dans {SORTIE.relative_to(RACINE)}")
+    print(f"Figures écrites dans {SORTIE.relative_to(RACINE.parent)}")
 
 
 if __name__ == "__main__":

@@ -7,10 +7,11 @@ les méthodes vues en cours.
 | Document | Contenu |
 |---|---|
 | **README.md** (ce fichier) | le projet en bref, comment lancer le code |
-| [Rapport-DALAS-Deliverable1/build/Rapport-DALAS-Deliverable1.pdf](Rapport-DALAS-Deliverable1/build/Rapport-DALAS-Deliverable1.pdf) | **le rapport du livrable 1** (2 pages) : questions, collecte, description quantitative, prétraitement |
-| [EXPLICATIONS.md](EXPLICATIONS.md) | **l'explication détaillée** : chaque source, chaque table, chaque choix, et pourquoi, au regard des cours ; la suite du projet |
-| [CHANGELOG_DATA.md](CHANGELOG_DATA.md) | une ligne par changement des données : date, auteur, quoi, pourquoi |
-| `manifestes/` | l'état exact des tables à chaque construction de référence (lignes, sommes, empreintes) |
+| [livrables/livrable1/build/Rapport-DALAS-Deliverable1.pdf](livrables/livrable1/build/Rapport-DALAS-Deliverable1.pdf) | **le rapport du livrable 1** (2 pages) : questions, collecte, description quantitative, prétraitement |
+| [livrables/livrable2/Plan-DALAS-Deliverable2.pdf](livrables/livrable2/Plan-DALAS-Deliverable2.pdf) | le plan du livrable 2 (dashboard) |
+| [dataset/EXPLICATIONS.md](dataset/EXPLICATIONS.md) | **l'explication détaillée** : chaque source, chaque table, chaque choix, et pourquoi, au regard des cours ; la suite du projet |
+| [dataset/CHANGELOG_DATA.md](dataset/CHANGELOG_DATA.md) | une ligne par changement des données : date, auteur, quoi, pourquoi |
+| `dataset/manifestes/` | l'état exact des tables à chaque construction de référence (lignes, sommes, empreintes) |
 
 ## Les questions
 
@@ -21,7 +22,7 @@ les méthodes vues en cours.
 
 La France est au centre : c'est le seul pays dont on a l'univers complet des médicaments, y compris ceux
 qui ne sont jamais en pénurie. L'Italie, l'Allemagne, la Norvège, la Suède, la Tchéquie et la Slovaquie servent de signaux. Détails dans
-[EXPLICATIONS.md](EXPLICATIONS.md), section 1.
+[dataset/EXPLICATIONS.md](dataset/EXPLICATIONS.md), section 1.
 
 ## Avancement
 
@@ -29,26 +30,28 @@ qui ne sont jamais en pénurie. L'Italie, l'Allemagne, la Norvège, la Suède, l
 |---|---|
 | Niveau 1 : collecte des sources brutes | ✅ environ 800 fichiers, environ 870 Mo, empreintes vérifiées ; ancien site de l'ANSM (2015-2021), Italie depuis 2019, registres de Norvège (2019-2024), Suède et Tchéquie (depuis 2018), Slovaquie (depuis 04/2019) |
 | Niveau 2 : tables nettoyées | ✅ 25 tables, dont `shortage_events` (72 221 épisodes FR/IT/DE/NO/SE/CZ/SK) et `ansm_signalements` (22 501 signalements 2019-2025) ; contrôles automatiques |
-| Livrable 1 : rapport de 2 pages | ✅ `Rapport-DALAS-Deliverable1/` |
+| Livrable 1 : rapport de 2 pages | ✅ `livrables/livrable1/` |
 | Consommation mensuelle (Medic'AM) | ✅ `consommation_mensuelle` : 1 560 substances × 138 mois (01/2015 à 06/2026) ; 3 variables dans `panel_fr` |
-| Niveau 3 : table d'entraînement `panel_fr` | ✅ **complète, sans valeur vide** : 58 410 lignes × 25 colonnes (885 substances délivrées en ville × 66 mois, 04/2020 à 09/2025), cible (et cible des nouvelles pénuries, sur les substances calmes depuis 6 ou 12 mois), 17 variables et 2 indicateurs de couverture (Italie, Norvège), découpage temporel ; contrôles anti-fuite (recalcul, perturbation) ; voir [EXPLICATIONS.md](EXPLICATIONS.md), section 6 |
-| TME6 : dashboard | ⏳ |
+| Niveau 3 : table d'entraînement `panel_fr` | ✅ **complète, sans valeur vide** : 58 410 lignes × 25 colonnes (885 substances délivrées en ville × 66 mois, 04/2020 à 09/2025), cible (et cible des nouvelles pénuries, sur les substances calmes depuis 6 ou 12 mois), 17 variables et 2 indicateurs de couverture (Italie, Norvège), découpage temporel ; contrôles anti-fuite (recalcul, perturbation) ; voir [dataset/EXPLICATIONS.md](dataset/EXPLICATIONS.md), section 6 |
+| TME6 : dashboard | ⏳ plan dans `livrables/livrable2/` |
 | TME9 : rapport final | ⏳ |
 
 ## Lancer le code
 
-Les données ne sont **pas** sur GitHub (environ 500 Mo) : elles se régénèrent avec le code. Il faut
+Les données ne sont **pas** sur GitHub (environ 870 Mo) : elles se régénèrent avec le code. Il faut
 Python 3.11 ou plus récent (pandas 3 l'exige). Testé avec Python 3.14 et pandas 3.0 et 3.1.
+L'environnement Python est à la racine ; **le code se lance depuis le dossier `dataset/`**.
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
-.venv/bin/python -m collecte              # niveau 1 : télécharge tout dans data/raw/ (environ 10 min)
-.venv/bin/python -m nettoyage             # niveau 2 : tables dans data/clean/ (environ 30 s), puis niveau 3 : data/final/panel_fr.parquet
-.venv/bin/python -m analyse.figures_rapport  # figures du rapport
-.venv/bin/python -m analyse.diagnostics    # graphiques de contrôle des données (data/diagnostics/)
-.venv/bin/python -m analyse.description     # description chiffrée du dataset (tableaux du rapport)
-.venv/bin/python -m analyse.faisabilite    # faisabilité chiffrée sur panel_fr : cible, Q1 et Q2, bruts puis contrôlés
+cd dataset
+../.venv/bin/python -m collecte              # niveau 1 : télécharge tout dans data/raw/ (environ 15 min)
+../.venv/bin/python -m nettoyage             # niveau 2 : tables dans data/clean/ (environ 1 min), puis niveau 3 : data/final/panel_fr.parquet
+../.venv/bin/python -m analyse.figures_rapport  # figures du rapport (écrites dans livrables/livrable1/figures/)
+../.venv/bin/python -m analyse.diagnostics    # graphiques de contrôle des données (data/diagnostics/)
+../.venv/bin/python -m analyse.description     # description chiffrée du dataset (tableaux du rapport)
+../.venv/bin/python -m analyse.faisabilite    # faisabilité chiffrée sur panel_fr : cible, Q1 et Q2, bruts puis contrôlés
 ```
 
 - Étapes isolées : `python -m collecte actuelles wayback`, `python -m nettoyage controles`.
@@ -56,7 +59,7 @@ python3 -m venv .venv
   téléchargement échoue, elle s'arrête avec la liste des fichiers manquants.
 - Fin de la collecte et début du nettoyage : chaque fichier brut est comparé à son empreinte dans
   `data/raw/manifeste.csv`. Un fichier modifié ou abîmé arrête tout.
-- Fin du nettoyage : contrôles des tables, puis copie du manifeste dans `manifestes/` (à commiter).
+- Fin du nettoyage : contrôles des tables, puis copie du manifeste dans `dataset/manifestes/` (à commiter).
 - Les sources évoluent : relancer plus tard donne une photo du jour plus récente, donc des chiffres
   légèrement différents. Le manifeste dit si un écart vient du code ou des données.
 - Particularités : Open Medic refuse les téléchargements simultanés (années téléchargées une par une) ;
@@ -66,47 +69,39 @@ python3 -m venv .venv
 ## Organisation
 
 ```
-collecte/                 niveau 1
-├── __main__.py           lance les étapes en parallèle, puis vérifie les empreintes
-├── commun.py             session HTTP, téléchargement, manifeste
-├── sources_actuelles.py  photo du jour : BDPM, ANSM, AIFA, BfArM, liste critique de l'UE
-├── ansm_signalements.py  signalements de rupture, un classeur par an (2019-2025)
-├── open_medic.py         consommation 2019-2025
-├── norvege.py            registres annuels des pénuries en Norvège (DMP, 2019 → 07/2024, archivés)
-├── suede.py              interruptions de vente en Suède (Läkemedelsverket, XML ouverts, depuis 2018)
-├── tchequie.py           déclarations d'interruption et de reprise en Tchéquie (SÚKL, depuis 2018)
-├── slovaquie.py          déclarations d'interruption et de reprise en Slovaquie (ŠÚKL, depuis 04/2019) et liste des médicaments (ATC)
-├── medicam.py            consommation mensuelle 2015 à 06/2026 (Medic'AM)
-├── wayback.py            archives mensuelles de la Wayback Machine (dont l'ancien site de l'ANSM, 2015-2021)
-└── verification.py       empreintes de la couche brute conformes au manifeste
-
-nettoyage/                niveau 2 : une étape par fichier, lancées dans l'ordre
-├── commun.py             chemins, normalisation des textes, écriture + manifeste des tables
-├── bdpm.py               BDPM du jour → bdpm_*
-├── bdpm_historique.py    archives BDPM → bdpm_*_historique (versions datées)
-├── ue_liste_critique.py  liste critique de l'UE
-├── open_medic.py         → atc, cip_atc, consommation
-├── medicam.py            → consommation_mensuelle (ATC5 × mois) et ses contrôles
-├── produits.py           ATC5 de chaque médicament français
-├── ansm.py               page ANSM → ansm_observations
-├── ansm_fiches.py        chaque fiche ANSM reliée à un médicament et un ATC5
-├── ansm_episodes.py      observations → épisodes de pénurie
-├── ansm_signalements.py  classeurs → ansm_signalements
-├── europe.py             Italie, Allemagne, Norvège, Suède, Tchéquie, Slovaquie → europe_observations, europe_episodes
-├── evenements.py         table centrale shortage_events
-├── france_mensuel.py     → penuries_fr_mensuel (substance × mois)
-├── controles.py          contrôles des tables du niveau 2
-└── panel.py              niveau 3 : table d'entraînement panel_fr (data/final/), avec ses contrôles
-
-analyse/figures_rapport.py figures du rapport
-analyse/diagnostics.py    graphiques de contrôle : tailles des archives, lignes lues, cohérence des sources, durées…
-analyse/description.py    description du dataset : dimensions, couverture, durées, gravité, causes, analyse exploratoire (manquants, asymétrie, corrélations)
-analyse/faisabilite.py    faisabilité : taux de cas positifs, repère naïf, exposition pour Q1 et Q2
-Rapport-DALAS-Deliverable1/ rapport du livrable 1 (LaTeX et PDF)
+README.md, requirements.txt, .venv/   à la racine
+dataset/                  tout ce qui construit et décrit le dataset
+├── EXPLICATIONS.md       chaque source, chaque table, chaque choix
+├── CHANGELOG_DATA.md     une ligne par changement des données
+├── manifestes/           état des tables à chaque construction de référence
+├── data/                 (non versionné) raw/ brut, clean/ tables, final/ panel, diagnostics/
+├── collecte/             niveau 1
+│   ├── __main__.py           lance les étapes en parallèle, puis vérifie les empreintes
+│   ├── commun.py             session HTTP, téléchargement, manifeste
+│   ├── sources_actuelles.py  photo du jour : BDPM, ANSM, AIFA, BfArM, liste critique de l'UE
+│   ├── ansm_signalements.py  signalements de rupture, un classeur par an (2019-2025)
+│   ├── open_medic.py         consommation 2019-2025
+│   ├── medicam.py            consommation mensuelle 2015 à 06/2026 (Medic'AM)
+│   ├── norvege.py            registres annuels des pénuries en Norvège (DMP, 2019 → 07/2024, archivés)
+│   ├── suede.py              interruptions de vente en Suède (Läkemedelsverket, XML ouverts, depuis 2018)
+│   ├── tchequie.py           déclarations d'interruption et de reprise en Tchéquie (SÚKL, depuis 2018)
+│   ├── slovaquie.py          déclarations en Slovaquie (ŠÚKL, depuis 04/2019) et liste des médicaments (ATC)
+│   ├── wayback.py            archives mensuelles de la Wayback Machine (dont l'ancien site de l'ANSM, 2015-2021)
+│   └── verification.py       empreintes de la couche brute conformes au manifeste
+├── nettoyage/            niveau 2 : une étape par fichier, lancées dans l'ordre ; puis niveau 3
+│   ├── commun.py             chemins, normalisation des textes, écriture + manifeste des tables
+│   ├── bdpm.py, bdpm_historique.py, ue_liste_critique.py, open_medic.py, medicam.py, produits.py
+│   ├── ansm.py, ansm_fiches.py, ansm_episodes.py, ansm_signalements.py   France
+│   ├── europe.py             Italie, Allemagne, Norvège, Suède, Tchéquie, Slovaquie
+│   ├── evenements.py         table centrale shortage_events
+│   ├── france_mensuel.py     → penuries_fr_mensuel (substance × mois)
+│   ├── controles.py          contrôles des tables du niveau 2
+│   └── panel.py              niveau 3 : table d'entraînement panel_fr (data/final/), avec ses contrôles
+└── analyse/              description, diagnostics, faisabilité, figures du rapport
+livrables/
+├── livrable1/            rapport du livrable 1 (LaTeX ; PDF dans build/)
+└── livrable2/            plan du livrable 2 (dashboard)
 ```
-
-Données (non versionnées) : `data/raw/` (brut, lecture seule), `data/clean/` (tables Parquet), puis, avec
-le niveau 3, `data/final/`, `models/` et `outputs/`.
 
 L'historique complet du travail (audit, notes de conception, étude de faisabilité) est sur la branche
 [`ozan`](https://github.com/OzanTaskin/DALAS_DATASET/tree/ozan).

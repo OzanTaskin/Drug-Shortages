@@ -1,10 +1,10 @@
 # Explications détaillées
 
 Ce document accompagne le code et le rapport TME4
-([Rapport-DALAS-Deliverable1.pdf](Rapport-DALAS-Deliverable1/build/Rapport-DALAS-Deliverable1.pdf)). Il explique **ce que contient le
+([Rapport-DALAS-Deliverable1.pdf](../livrables/livrable1/build/Rapport-DALAS-Deliverable1.pdf)). Il explique **ce que contient le
 dataset, comment il est construit et pourquoi**, en s'appuyant sur les cours *Building a Dataset from a
 Warehouse* (28/09) et *Data Families, Storage Formats and Databases* (05/10). Pour lancer le code, voir le
-[README](README.md) ; pour l'historique des changements de données, [CHANGELOG_DATA.md](CHANGELOG_DATA.md).
+[README](../README.md) ; pour l'historique des changements de données, [CHANGELOG_DATA.md](CHANGELOG_DATA.md).
 
 Les chiffres viennent de l'exécution du 22/10/2026 (`manifestes/niveau2_2026-10-22.json`).
 
