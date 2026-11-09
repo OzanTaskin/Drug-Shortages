@@ -61,6 +61,9 @@ Suède et Tchéquie : des registres complets, pas des photos ; ils ne passent pa
   déclarée, l'épisode reste `en_cours` (les reprises ne sont pas toujours déclarées : durée à lire avec
   prudence). Les arrêts seuls sont des épisodes `arret_definitif`. `publication` = date de déclaration (le
   Market report est mis à jour en continu) ; `debut` = date d'effet de l'interruption.
+- Slovaquie : même logique que la Tchéquie, sur l'export du portail du ŠÚKL (depuis 04/2019) : `publication` =
+  date de dépôt, `debut` = date d'effet. L'export n'a ni ATC, ni substance, ni cause : l'ATC vient de la liste des
+  médicaments du ŠÚKL par le code produit (actuelle, puis archives 12/2022 et 12/2019).
 """
 import io
 import re
@@ -285,34 +288,78 @@ def episodes_tcheques():
         "raison": declarations["duvodPreruseni"].map(lambda r: (r or {}).get("en") or None),
     }).dropna(subset=["effet", "declaration"]).sort_values(["produit", "effet", "declaration", "id"])
 
+    types = {"preruseni": "interruption", "obnoveni": "reprise", "ukonceni": "arret"}
+    return episodes_par_declarations(declarations.assign(type=declarations["type"].map(types)), "CZ")
+
+
+def episodes_par_declarations(declarations, pays):
+    """Tchéquie, Slovaquie : déclarations d'un produit (interruption, reprise, arrêt) → épisodes.
+    `declarations` : id, produit, type, medicament, substance, atc5, effet, declaration, reprise_prevue, raison."""
+    declarations = declarations.sort_values(["produit", "effet", "declaration", "id"])
     episodes, ouverts = [], {}
-    def fermer(produit, fin, connue):
-        e = ouverts.pop(produit)
-        # Interruption déclarée en retard, après sa reprise : la fin n'est connue qu'à la publication.
-        e.update(fin=fin, fin_au_plus_tard=max(connue, e["publication"]), en_cours=False)
-        episodes.append(e)
+
+    def nouveau(d, type_episode):
+        return {"pays": pays, "id_episode": f"{d.produit}_{d.id}", "medicament": d.medicament,
+                "substance": d.substance, "atc5": d.atc5, "nb_produits": 1, "debut": d.effet,
+                "debut_declare_initial": d.effet, "fin_prevue": d.reprise_prevue, "premiere_photo": d.declaration,
+                "derniere_photo": d.declaration, "publication": d.declaration, "raison": d.raison, "criticite": None,
+                "type_episode": type_episode, "fin": pd.NaT, "fin_au_plus_tard": pd.NaT, "en_cours": True}
+
     for d in declarations.itertuples():
-        if d.type == "preruseni":
+        if d.type == "interruption":
             if d.produit in ouverts:  # nouvelle interruption pendant un épisode ouvert : il continue
                 ouverts[d.produit].update(fin_prevue=d.reprise_prevue, derniere_photo=d.declaration)
-                continue
-            ouverts[d.produit] = {"pays": "CZ", "id_episode": f"{d.produit}_{d.id}", "medicament": d.medicament,
-                                  "substance": d.substance, "atc5": d.atc5, "nb_produits": 1, "debut": d.effet,
-                                  "debut_declare_initial": d.effet, "fin_prevue": d.reprise_prevue,
-                                  "premiere_photo": d.declaration, "derniere_photo": d.declaration,
-                                  "publication": d.declaration, "raison": d.raison, "criticite": None,
-                                  "type_episode": "penurie", "fin": pd.NaT, "fin_au_plus_tard": pd.NaT, "en_cours": True}
+            else:
+                ouverts[d.produit] = nouveau(d, "penurie")
         elif d.produit in ouverts:  # reprise ou arrêt : l'épisode ouvert se ferme
-            fermer(d.produit, d.effet, max(d.effet, d.declaration))
-        elif d.type == "ukonceni":
-            episodes.append({"pays": "CZ", "id_episode": f"{d.produit}_{d.id}", "medicament": d.medicament,
-                             "substance": d.substance, "atc5": d.atc5, "nb_produits": 1, "debut": d.effet,
-                             "debut_declare_initial": d.effet, "fin_prevue": pd.NaT, "premiere_photo": d.declaration,
-                             "derniere_photo": d.declaration, "publication": d.declaration, "raison": d.raison,
-                             "criticite": None, "type_episode": "arret_definitif", "fin": d.effet,
-                             "fin_au_plus_tard": max(d.effet, d.declaration), "en_cours": False})
-    episodes += list(ouverts.values())
-    return pd.DataFrame(episodes)
+            e = ouverts.pop(d.produit)
+            # Interruption déclarée en retard, après sa reprise : la fin n'est connue qu'à la publication.
+            e.update(fin=d.effet, fin_au_plus_tard=max(d.effet, d.declaration, e["publication"]), en_cours=False)
+            episodes.append(e)
+        elif d.type == "arret":
+            e = nouveau(d, "arret_definitif")
+            e.update(fin_prevue=pd.NaT, fin=d.effet, fin_au_plus_tard=max(d.effet, d.declaration), en_cours=False)
+            episodes.append(e)
+    return pd.DataFrame(episodes + list(ouverts.values()))
+
+
+def atc_slovaques():
+    """Code ŠÚKL → ATC5, d'après la liste des médicaments actuelle puis les archives (la plus récente prime)."""
+    import io
+    import zipfile
+
+    def classeur(archive, chemin=()):
+        """Ouvre `archive` (zip), descend dans les zips imbriqués `chemin`, lit le classeur zoznam_liekov.*"""
+        z = zipfile.ZipFile(archive)
+        for interieur in chemin:
+            z = zipfile.ZipFile(io.BytesIO(z.read(interieur)))
+        nom = next(n for n in z.namelist() if n.lower().startswith("zoznam_liekov."))
+        table = pd.read_excel(io.BytesIO(z.read(nom)), dtype=str)
+        return table.set_index(table["ŠÚKL kód"].str.strip())["ATC kód"].map(atc5_valide).dropna()
+
+    dossier = RAW / "sukl_sk"
+    actuelle = sorted(dossier.glob("*_zoznam_liekov_aktualny.zip"))[-1]
+    sources = [classeur(actuelle), classeur(dossier / "Lieky2022.zip", ["zoznam_liekov_2022_12.zip"]),
+               classeur(dossier / "Lieky2019.zip", ["zoznam_liekov_2019_12.zip"])]
+    atc = pd.concat(sources)
+    return atc[~atc.index.duplicated(keep="first")]
+
+
+def episodes_slovaques():
+    chemin = sorted((RAW / "sukl_sk").glob("*_hlasenia_prerusenia.csv"))[-1]
+    brut = pd.read_csv(chemin, sep=";", encoding="utf-8-sig", dtype=str, keep_default_na=False)
+    types = {"R": "interruption", "O": "reprise", "Z": "arret"}  # U (première mise sur le marché) : ignoré
+    brut = brut[brut["Predmet"].isin(types)]
+    produit = brut["Kód"].str.strip()
+    declarations = pd.DataFrame({
+        # Pas d'identifiant de déclaration : l'ordre dans le fichier (le plus récent en premier) en tient lieu.
+        "id": range(len(brut), 0, -1), "produit": produit, "type": brut["Predmet"].map(types),
+        "medicament": brut["Liek"].str.strip(), "substance": None, "atc5": produit.map(atc_slovaques()),
+        "effet": pd.to_datetime(brut["Účinnosť"], format="%Y-%m-%d", errors="coerce"),
+        "declaration": pd.to_datetime(brut["Podanie"].str[:10], format="%Y-%m-%d", errors="coerce"),
+        "reprise_prevue": pd.NaT, "raison": None,
+    }).dropna(subset=["effet", "declaration"])
+    return episodes_par_declarations(declarations, "SK")
 
 
 def episodes_italiens(observations):
@@ -397,7 +444,8 @@ def construire():
                                     for pays, fin in zip(episodes["pays"], episodes["fin"])]
     episodes["fin_au_plus_tard"] = pd.to_datetime(episodes["fin_au_plus_tard"])
     episodes = pd.concat([episodes, norvege[episodes.columns], episodes_suedois()[episodes.columns],
-                          episodes_tcheques()[episodes.columns]], ignore_index=True)
+                          episodes_tcheques()[episodes.columns], episodes_slovaques()[episodes.columns]],
+                         ignore_index=True)
     enregistrer(episodes, "europe_episodes")
     for pays, groupe in episodes.groupby("pays"):
         print(f"  {pays} : {len(groupe)} épisodes, ATC5 connu pour {groupe['atc5'].notna().mean():.0%}")

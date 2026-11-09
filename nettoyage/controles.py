@@ -86,7 +86,7 @@ def controler_reconciliation():
            f"{signalements['atc5'].notna().sum()} signalements, {dans_le_panel} dans le panel")
 
     evenements = lire("shortage_events")
-    for source, pays in (("ansm_episodes", ["FR"]), ("europe_episodes", ["IT", "DE", "NO", "SE", "CZ"])):
+    for source, pays in (("ansm_episodes", ["FR"]), ("europe_episodes", ["IT", "DE", "NO", "SE", "CZ", "SK"])):
         attendu, obtenu = len(lire(source)), evenements["pays"].isin(pays).sum()
         yield f"{source} → shortage_events sans perte", attendu == obtenu, f"{attendu} épisodes, {obtenu} gardés"
 

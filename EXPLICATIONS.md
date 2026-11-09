@@ -70,6 +70,7 @@ Toutes sont publiques et officielles, collectées par `python -m collecte` (05/1
 | **BfArM** (Allemagne, CSV) | 963 déclarations, avec ATC, dates et **raison** de la pénurie |
 | **Läkemedelsverket** (Suède, XML ouverts, en cours + historique) | interruptions de vente depuis 2018, avec **date de publication**, début, fin réelle, cause, ATC (91 %) |
 | **SÚKL** (Tchéquie, « Market report », interface JSON) | déclarations d'interruption, de reprise et d'arrêt depuis 2018 (2009 dans la source), avec **date de déclaration**, date d'effet, reprise prévue, ATC |
+| **ŠÚKL** (Slovaquie, export CSV du portail public) | déclarations d'interruption, de reprise et d'arrêt depuis 04/2019, avec **date de dépôt** et date d'effet ; ATC repris de la liste des médicaments du ŠÚKL (96 %) |
 | **DMP** (Norvège, XLSX annuels, via la Wayback Machine) | registre des pénuries 2019 → 12/07/2024 : 6 499 épisodes, avec **date de déclaration**, période, cause, statut, ATC (97 %) |
 | **Liste critique de l'UE** (EMA, XLSX) | 299 substances critiques, avec code ATC5 et **date d'inscription** (12/2023 → 2025) |
 
@@ -77,7 +78,7 @@ Toutes sont publiques et officielles, collectées par `python -m collecte` (05/1
 l'EMA n'apportaient rien. Collectées au début, elles ont été retirées le 15/10/2026. Seule la liste
 critique de l'UE a été gardée, parce que sa date d'inscription la rend utilisable sans fuite.
 
-**Pays examinés le 09/11/2026.** Retenus : Norvège, Suède et Tchéquie (ci-dessus), les seuls registres trouvés
+**Pays examinés le 09/11/2026.** Retenus : Norvège, Suède, Tchéquie et Slovaquie (ci-dessus), les seuls registres trouvés
 avec un historique complet, une date de publication et l'ATC. Écartés :
 - Finlande (Fimea) : fichier ouvert, mais pénuries en cours seulement, sans ATC, 4 archives depuis 11/2024 ;
 - Espagne (CIMA) : l'interface ne donne que les problèmes en cours (921), la page publique archivée est vide
@@ -88,6 +89,12 @@ avec un historique complet, une date de publication et l'ATC. Écartés :
 - Irlande (HPRA) : liste archivée de 2019 à 01/2023 (environ 90 pénuries par photo, sans ATC) : possible plus
   tard, apport faible ;
 - Allemagne : la page web du BfArM est archivée depuis 2021, mais ses données sont chargées par JavaScript ;
+- Pologne : liste « anti-exportation » des médicaments menacés d'indisponibilité, en PDF tous les deux mois :
+  un risque, pas une pénurie constatée ; non intégrée ;
+- Slovénie, Lettonie, Estonie, Hongrie, Islande : pénuries visibles dans le registre des médicaments à l'état du
+  jour, sans historique téléchargeable trouvé ; Croatie : fichier du jour ; Lituanie : tableau depuis 04/2026
+  seulement ; Roumanie : notifications en PDF ; Bosnie-Herzégovine : registre injoignable ; Danemark : signalé
+  dans les listes de prix (Medicinpriser), historique non vérifié ;
 - agrégateurs : ShortageWatch (CSV du jour seulement, historique payant), Mobidoctor (accès refusé), EDJNet
   (22 107 pénuries 2018-2023, pas de téléchargement) : non utilisables comme source historique.
 
@@ -371,7 +378,9 @@ virgule flottante, précision des dates selon la version de pandas) a été corr
 > Suède (`se_nouvelle_3m`) et Tchéquie (`cz_nouvelle_3m`), couvertes sur toute la période, ajoutées ensuite :
 > 20 colonnes ; AUC test 0,857 avec la Suède, 0,857 avec la Tchéquie, 0,861 avec tous les pays (0,856 sans). Une
 > nouvelle déclaration en Suède ou en Tchéquie double presque le taux de positifs bruts (58 et 60 % contre 26 et
-> 25 %), mais l'historique de la substance en France l'explique déjà presque entièrement.
+> 25 %), mais l'historique de la substance en France l'explique déjà presque entièrement. Slovaquie
+> (`sk_nouvelle_3m`, 21 colonnes) : 61 % de positifs si exposée contre 27 %, AUC test 0,856 seule, 0,861 avec
+> tous les pays.
 >
 > **Mise à jour du 09/11/2026 : panel complet.** Le panel décrit ci-dessous (99 063 lignes) a été refait. Il compte
 > désormais **40 710 lignes sans aucune valeur vide** : 885 substances délivrées en ville × 46 mois (12/2021 à 09/2025).

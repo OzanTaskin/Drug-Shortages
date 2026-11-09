@@ -1,5 +1,5 @@
 """`shortage_events` : la table centrale du niveau 2. Une ligne = un épisode de pénurie,
-dans un pays, au même format pour la France, l'Italie, l'Allemagne, la Norvège, la Suède et la Tchéquie.
+dans un pays, au même format pour la France, l'Italie, l'Allemagne, la Norvège, la Suède, la Tchéquie et la Slovaquie.
 
 Colonnes communes :
     pays, id_episode, medicament, substance, atc5, atc4, debut, fin, en_cours,
@@ -15,8 +15,8 @@ Colonnes communes :
     fin_connue_le (photo où l'on voit que l'épisode est terminé : `fin` ne peut servir à une date d
     que si fin_connue_le < d, voir `ansm_episodes.py`)
 La France vient de `ansm_episodes`, les autres pays de `europe_episodes`.
-Norvège, Suède, Tchéquie : registres et non photos ; un épisode n'est censuré à gauche que s'il a été publié
-avant le début collecté (2019 pour la Norvège, 2018 pour les deux autres).
+Norvège, Suède, Tchéquie, Slovaquie : registres et non photos ; un épisode n'est censuré à gauche que s'il a été publié
+avant le début collecté (2019 pour la Norvège, 2018 pour la Suède et la Tchéquie, 04/2019 pour la Slovaquie).
 
 Types : les colonnes à peu de valeurs distinctes sont en dtype `category` (une valeur stockée une
 fois, un petit code par ligne) ; la gravité est une catégorie ordonnée.
@@ -31,7 +31,8 @@ COLONNES = ["pays", "id_episode", "medicament", "substance", "atc5", "atc4", "de
             "censure_gauche", "censure_droite", "fin_connue_le"]
 DATES = ["debut", "fin", "publication", "fin_connue_le"]
 # Registres (et non photos) : un épisode n'est censuré à gauche que s'il a été publié avant le début collecté.
-DEBUT_REGISTRES = {"NO": pd.Timestamp("2019-01-01"), "SE": pd.Timestamp("2018-01-01"), "CZ": pd.Timestamp("2018-01-01")}
+DEBUT_REGISTRES = {"NO": pd.Timestamp("2019-01-01"), "SE": pd.Timestamp("2018-01-01"), "CZ": pd.Timestamp("2018-01-01"),
+                   "SK": pd.Timestamp("2019-04-15")}
 CATEGORIES = {"pays": None, "type_episode": None, "criticite": None,
               "gravite": pd.CategoricalDtype(list(GRAVITE), ordered=True)}
 

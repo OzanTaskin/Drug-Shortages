@@ -39,7 +39,7 @@ def calculer():
               "IT": europe[europe["pays"] == "IT"]["date_photo"], "DE": europe[europe["pays"] == "DE"]["date_photo"],
               "NO": europe[europe["pays"] == "NO"]["date_photo"]}  # Norvège : un classeur annuel par « photo »
     # Suède, Tchéquie : registres sans photos ; la « période » est celle des publications.
-    for pays in ("SE", "CZ"):
+    for pays in ("SE", "CZ", "SK"):
         photos[pays] = evenements.loc[evenements["pays"] == pays, "publication"]
     resultat["pays"] = {}
     for pays, g in penuries.groupby("pays", observed=True):

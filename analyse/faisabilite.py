@@ -25,6 +25,7 @@ EXPOSITIONS = {  # nom : (colonne, exposée si, colonne de couverture ou None)
     "Q2 Norvège : même substance déclarée": ("no_nouvelle_3m", lambda x: x > 0, "no_couvert"),
     "Q2 Suède : même substance déclarée": ("se_nouvelle_3m", lambda x: x > 0, None),
     "Q2 Tchéquie : même substance déclarée": ("cz_nouvelle_3m", lambda x: x > 0, None),
+    "Q2 Slovaquie : même substance déclarée": ("sk_nouvelle_3m", lambda x: x > 0, None),
     "Contrôle : même substance affichée en France": ("fr_affichee_3m", lambda x: x > 0, None),
 }
 
@@ -61,7 +62,7 @@ def facteurs():
     for entree, sortie in [("conso_6m_pub", "conso"), ("sig_annee_pub", "sig"), ("sig_cumul_pub", "sig_cumul")]:
         t[sortie] = np.log1p(t[entree].astype("float64"))
     t["tendance"], t["saison"] = np.log(t["conso_tendance_6m"].astype("float64")), np.log(t["conso_saison_cible"].astype("float64"))
-    for c in ["fr_affichee_3m", "fr_autres_classe_3m", "it_affichee_3m", "it_couvert", "no_nouvelle_3m", "no_couvert", "se_nouvelle_3m", "cz_nouvelle_3m"]:
+    for c in ["fr_affichee_3m", "fr_autres_classe_3m", "it_affichee_3m", "it_couvert", "no_nouvelle_3m", "no_couvert", "se_nouvelle_3m", "cz_nouvelle_3m", "sk_nouvelle_3m"]:
         t[c] = t[c].astype("float64")
     base = ["conso", "tendance", "saison", "ue_critique", "sig", "sig_cumul", "fr_affichee_3m"]
 
@@ -77,7 +78,8 @@ def facteurs():
     return {"Q1 sans": auc(t, base), "Q1 avec": auc(t, base + ["fr_autres_classe_3m"]),
             "Q2 Italie sans": auc(t, base), "Q2 Italie avec": auc(t, base + ["it_affichee_3m", "it_couvert"]),
             "Q2 Suède avec": auc(t, base + ["se_nouvelle_3m"]), "Q2 Tchéquie avec": auc(t, base + ["cz_nouvelle_3m"]),
-            "Q2 tous pays avec": auc(t, base + ["it_affichee_3m", "it_couvert", "se_nouvelle_3m", "cz_nouvelle_3m"]),
+            "Q2 Slovaquie avec": auc(t, base + ["sk_nouvelle_3m"]),
+            "Q2 tous pays avec": auc(t, base + ["it_affichee_3m", "it_couvert", "se_nouvelle_3m", "cz_nouvelle_3m", "sk_nouvelle_3m"]),
             "Q2 Norvège sans (validation 01-06/2024)": auc(norvege, base, "validation"),
             "Q2 Norvège avec (validation 01-06/2024)": auc(norvege, base + ["no_nouvelle_3m", "no_couvert"], "validation")}
 

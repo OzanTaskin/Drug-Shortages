@@ -13,8 +13,8 @@ Panel COMPLET : aucune valeur vide. Les choix qui l'assurent (décidés avec les
     Italie (`it_affichee_3m`) : photos mensuelles de la liste AIFA depuis 10/2021, couvert pour t ≥ 12/2021 ;
     Norvège (`no_nouvelle_3m`) : registre de la DMP, classeurs 2019 au 12/07/2024, couvert pour
     t ≤ 06/2024 ;
-  la Suède (`se_nouvelle_3m`, Läkemedelsverket depuis 2018) et la Tchéquie (`cz_nouvelle_3m`, SÚKL depuis 2018)
-  couvrent toute la période : pas d'indicateur de couverture ;
+  la Suède (`se_nouvelle_3m`, Läkemedelsverket depuis 2018), la Tchéquie (`cz_nouvelle_3m`, SÚKL depuis 2018) et la
+  Slovaquie (`sk_nouvelle_3m`, ŠÚKL depuis 04/2019) couvrent toute la période : pas d'indicateur de couverture ;
 - l'Allemagne n'est pas dans le panel : 13 mois d'archives seulement (depuis 09/2024).
 
 Cible `cible` : 1 si au moins un signalement de rupture est déclaré à l'ANSM pour la substance
@@ -51,7 +51,7 @@ T = len(MOIS) - HORIZON  # dernier t : ses 3 mois de cible sont complets
 PAYS = ("FR", "IT")  # pays dont on lit la liste affichée ; l'Allemagne (depuis 09/2024) est hors panel
 PREMIER_T = pd.Period("2020-04", "M")  # premier t où la dernière année de signalements publiée (2019) existe
 DEBUT = int((PREMIER_T - MOIS[0]).n)
-REGISTRES = ("NO", "SE", "CZ")  # registres avec date de publication : signal = nouvelle déclaration sur 3 mois
+REGISTRES = ("NO", "SE", "CZ", "SK")  # registres avec date de publication : signal = nouvelle déclaration sur 3 mois
 # Couverture des signaux européens : (premier t couvert, dernier t couvert), bornes comprises.
 COUVERTURE = {"it": (pd.Period("2021-12", "M"), None), "no": (None, pd.Period("2024-06", "M"))}
 DECOUPAGE = [("entrainement", "2020-04", "2023-09"), ("ecart", "2023-10", "2023-12"),
