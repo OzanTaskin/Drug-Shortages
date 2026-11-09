@@ -16,3 +16,6 @@ __pycache__/
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+
+# Documents personnels (non publiés sur GitHub)
+personnel/
