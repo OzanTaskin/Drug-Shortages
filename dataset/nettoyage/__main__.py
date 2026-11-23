@@ -13,7 +13,7 @@ import argparse
 
 from collecte import verification
 
-from . import (ansm, ansm_episodes, ansm_fiches, ansm_signalements, bdpm, bdpm_historique, controles,
+from . import (ansm, ansm_episodes, ansm_fiches, ansm_signalements, bdpm, bdpm_historique, controles, couverture,
                europe, evenements, france_mensuel, medicam, open_medic, panel, produits, ue_liste_critique)
 
 # L'ordre compte : une étape peut lire les tables produites par les précédentes.
@@ -30,6 +30,7 @@ ETAPES = {
     "ansm_signalements": ansm_signalements.construire,
     "europe": europe.construire,
     "evenements": evenements.construire,
+    "couverture": couverture.construire,
     "france_mensuel": france_mensuel.construire,
     "controles": controles.construire,
     "panel": panel.construire,  # niveau 3 : lit les tables nettoyées contrôlées ci-dessus

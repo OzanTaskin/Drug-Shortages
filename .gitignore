@@ -1,5 +1,11 @@
-# Données (dataset/data/) : trop lourdes pour GitHub (environ 870 Mo), régénérées par `python -m collecte`
-data/
+# Données brutes (dataset/data/raw/, environ 900 Mo) : régénérées par `python -m collecte`.
+# Les tables nettoyées (data/clean, 20 Mo) et le panel (data/final, < 1 Mo) SONT versionnés : ce sont le dataset livré.
+dataset/data/raw/
+dataset/data/diagnostics/
+
+# Tests de modèles : locaux, non versionnés (ils servent à vérifier que le dataset va dans le bon sens)
+dataset/data/resultats/
+dataset/analyse/modeles.py
 
 # Environnement Python
 .venv/

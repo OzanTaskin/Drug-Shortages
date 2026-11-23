@@ -368,6 +368,23 @@ virgule flottante, précision des dates selon la version de pandas) a été corr
 
 ## 6. La table d'entraînement (niveau 3, construite) et la suite
 
+> **Mise à jour du 23/11/2026 : audit et corrections du dataset.** Un audit a trouvé des défauts qui ne changeaient pas
+> les chiffres du panel mais fausseraient des courbes de dashboard ou une évaluation de modèle. Corrigés (détail dans
+> [DICTIONNAIRE.md](DICTIONNAIRE.md) et [CHANGELOG_DATA.md](CHANGELOG_DATA.md)) : (1) la vérification de la couche brute
+> ne voyait pas un fichier effacé ; (2) `shortage_events` marque les dates impossibles (2 419 fins avant début, 928
+> débuts futurs), les doublons (5 636) et les épisodes ouverts depuis plus de 2 ans (1 369) au lieu de les laisser
+> passer ; (3) `couverture_mensuelle` dit, pays par pays, quels mois sont observés : l'Italie a des trous d'archive de
+> 4 à 11 mois (09/2019-08/2020, 04-10/2021, 06-10/2023, 11/2025-09/2026, vérifiés à l'index de la Wayback Machine :
+> aucune capture n'existe pour ces mois), la Slovaquie, la Tchéquie et la Suède démarrent à zéro pendant 12 mois ;
+> (4) `panel_fr` gagne 23 colonnes (48 au total), dont la structure du marché (BDPM historisée : titulaires,
+> génériques, concentration), le prix par boîte, la récence de la dernière pénurie publiée, la cible des nouvelles
+> pénuries définie **avec ce qui est publié à t** (`calme_pub_*`) et Q1 normalisée par la taille de la classe. Des tests
+> de modèles (non versionnés) ont seulement vérifié que ces colonnes sont exploitables : sur cette cible, la structure
+> du marché est la seule famille qui améliore nettement le classement ; l'Europe (Q2) et la cascade (Q1) n'apportent
+> rien de mesurable. `ue_critique` reste dans le panel mais vaut 0 sur tout
+> l'entraînement : à ne pas utiliser. Les chiffres « 587 ruptures distinctes à l'entraînement et 84 au test » plus bas sont
+> périmés : le panel actuel compte 120 substances à nouvelle rupture dans le test (définition « vraies dates »).
+>
 > **Mise à jour du 09/11/2026 (3) : la cible des nouvelles pénuries.** La cible `cible` est trop facile : 97 % de ses
 > cas positifs de 2025 concernent une substance déjà signalée, et le cumul des signalements passés, seul, donne une AUC
 > de 0,852 (0,856 pour tout le modèle). Le panel ajoute donc `calme_12m` (aucun signalement de t-11 à t) et

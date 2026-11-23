@@ -31,6 +31,7 @@ GRAINS = {
     "ansm_episodes": ["fiche", "numero_episode"],
     "europe_episodes": ["pays", "id_episode"],
     "shortage_events": ["pays", "id_episode"],
+    "couverture_mensuelle": ["pays", "mois"],
     "penuries_fr_mensuel": ["atc5", "mois"],
     "ue_liste_critique": ["atc5"],
     "bdpm_specialites_historique": ["cis", "valid_from"],
@@ -150,6 +151,40 @@ def controler_dates():
     yield "fin connue après la publication", avant == 0, f"{avant} épisodes"
 
 
+def controler_qualite():
+    """Colonnes de qualité ajoutées aux épisodes, à la couverture et aux signalements : elles disent ce qui est
+    fiable sans supprimer de ligne ; leurs règles sont revérifiées ici à partir des colonnes brutes."""
+    ev = lire("shortage_events")
+    mauvaise = ev["fin"] < ev["debut"]
+    yield ("anomalie_date : fin avant début repérée sur toutes les lignes concernées",
+           (ev.loc[mauvaise, "anomalie_date"] == "fin_avant_debut").all(), f"{int(mauvaise.sum())} lignes")
+    yield ("part des épisodes à date impossible sous 10 %", (ev["anomalie_date"] != "aucune").mean() < 0.10,
+           f"{(ev['anomalie_date'] != 'aucune').mean():.1%}")
+    yield "duree_j positive, et vide en cas d'anomalie de date", \
+        bool((ev["duree_j"].dropna() >= 0).all() and ev.loc[ev["anomalie_date"] != "aucune", "duree_j"].isna().all()), "durée invalide"
+    yield "cause_connue = la source donne une raison", bool(
+        (ev["cause_connue"] == ev["raison"].fillna("").str.strip().ne("")).all()), "écart"
+    cle = ["pays", "atc5", "debut", "fin", "type_episode"]
+    premiers = ev[ev["atc5"].notna()].groupby(cle, dropna=False)["doublon"].apply(lambda s: (~s).sum())
+    yield "un seul épisode conservé par groupe de doublons", bool((premiers == 1).all()), f"{int((premiers != 1).sum())} groupes"
+    yield "ouvert_longue_duree seulement pour un épisode en cours", bool(
+        (~ev.loc[ev["ouvert_longue_duree"], "en_cours"]).sum() == 0), "épisode terminé marqué ouvert"
+
+    cov = lire("couverture_mensuelle")
+    for pays, g in cov.groupby("pays", observed=True):
+        mois_attendus = pd.date_range(g["mois"].min(), g["mois"].max(), freq="MS")
+        yield f"couverture_mensuelle {pays} : aucun mois manquant", len(mois_attendus) == len(g), f"{len(g)} sur {len(mois_attendus)}"
+    yield "couverture : substances du stock ≤ épisodes du stock", bool((cov["stock_substances"] <= cov["stock_episodes"]).all()), "incohérent"
+    yield "couverture : fiable = ni trou d'archive ni démarrage de registre", bool(
+        (cov["fiable"] == (~cov["trou_archive"] & ~cov["demarrage_registre"])).all()), "écart"
+
+    sig = lire("ansm_signalements")
+    avec_labo = sig["laboratoire"].notna()
+    yield "laboratoire_norm présent pour chaque signalement avec laboratoire", bool(sig.loc[avec_labo, "laboratoire_norm"].notna().all()), "vide"
+    yield "laboratoire_norm regroupe les libellés (jamais plus nombreux)", \
+        sig["laboratoire_norm"].nunique() <= sig["laboratoire"].nunique(), "plus de valeurs normalisées que brutes"
+
+
 def garder_le_manifeste():
     """Copie datée du manifeste dans manifestes/ (suivi par git) : il reste disponible pendant
     tout le projet pour comparer une exécution future à celle-ci (cours, diapos 65-66)."""
@@ -162,7 +197,7 @@ def garder_le_manifeste():
 
 def construire():
     for controles in (controler_grains, controler_atc5, controler_intervalles, controler_reconciliation,
-                      controler_medicam, controler_dates):
+                      controler_medicam, controler_dates, controler_qualite):
         for nom, reussi, detail in controles():
             if not reussi:
                 raise SystemExit(f"Contrôle en échec : {nom} — {detail}")

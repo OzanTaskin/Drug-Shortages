@@ -23,7 +23,7 @@ Les lignes sans ATC5 des deux sources n'entrent pas dans la table.
 import pandas as pd
 
 from .ansm_episodes import GRAVITE
-from .commun import CLEAN, enregistrer, normaliser_texte
+from .commun import CLEAN, enregistrer
 
 
 def mois_de(dates):
@@ -47,7 +47,7 @@ def construire():
     tous_les_mois = mois_signalements.union(mois_page)
 
     signalements = signalements.assign(mois=mois_de(signalements["date_signalement"]),
-                                       laboratoire=signalements["laboratoire"].map(normaliser_texte))
+                                       laboratoire=signalements["laboratoire_norm"])
     par_signalements = (signalements.groupby(["atc5", "mois"])
                         .agg(nb_signalements=("date_signalement", "size"),
                              nb_laboratoires_signalants=("laboratoire", "nunique")).reset_index())

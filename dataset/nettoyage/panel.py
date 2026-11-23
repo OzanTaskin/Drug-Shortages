@@ -41,6 +41,21 @@ du mois t. Un épisode de pénurie compte comme affiché de sa `publication` jus
 Pour les deux, les dates de publication sont des hypothèses documentées (data.gouv.fr, data.ansm) ; les
 contrôles vérifient qu'aucune donnée postérieure n'est lue.
 
+Variables ajoutées le 23/11/2026 (voir DICTIONNAIRE.md) :
+- marché (`mkt_*`) : nombre de médicaments commercialisés, de présentations, de titulaires, de génériques et part
+  d'injectables de la substance à la fin du mois t, lus dans la BDPM historisée (jointure as-of : une version n'est
+  connue qu'à partir de la photo où on la voit) ; `mkt_connu` vaut 0 si aucun médicament de la substance n'a pu
+  être rattaché à son ATC5 à cette date (environ 20 % des médicaments n'ont pas d'ATC5) ;
+- Q1 normalisée : `taille_classe` (substances de la classe ATC4) et `fr_part_classe_3m` (part des autres
+  substances de la classe affichées), car le nombre brut `fr_autres_classe_3m` croît avec la taille de la classe ;
+- `fr_affichee_6m`, `fr_affichee_12m` : substance affichée sur la page ANSM au cours des 6 ou 12 derniers mois ;
+- cible des nouvelles pénuries SANS fuite de définition : `calme_pub_*m` = ni affichée sur la page ANSM depuis k
+  mois, ni signalée l'année publiée la plus récente (tout cela est connu à t), et `cible_nouvelle_pub_*m` ;
+  contrairement à `calme_*m` (vraies dates des signalements, inconnues à t), c'est utilisable pour évaluer un
+  modèle dans les conditions de la production ;
+- fraîcheur de l'archive : `fr_age_photo_j`, `it_age_photo_j` (jours depuis la dernière photo connue à la fin du mois) ;
+- `semestre` : bloc de 6 mois, pour une validation glissante (voir analyse/decoupage.py).
+
 Découpage `jeu` (temporel, avec trois mois d'écart car la cible regarde trois mois en avant) :
 entraînement t ≤ 09/2023, écart, validation 01/2024 à 09/2024, écart, test 01/2025 à 09/2025.
 Les lignes d'écart restent dans la table (jeu = "ecart") mais ne servent à aucun jeu.
@@ -74,6 +89,19 @@ VARIABLES_CONSO = ["conso_6m_pub", "conso_tendance_6m", "conso_saison_cible"]
 # et il est défini pour toutes les substances vendues en ville.
 LISSAGE_SEMESTRE = 100
 LISSAGE_MOIS = 10
+
+
+ORDRE_COLONNES = [
+    "atc5", "mois", "annee", "mois_num", "semestre", "jeu",
+    "cible", "calme_6m", "cible_nouvelle_6m", "calme_12m", "cible_nouvelle_12m",
+    "calme_pub_6m", "cible_nouvelle_pub_6m", "calme_pub_12m", "cible_nouvelle_pub_12m",
+    "fr_affichee_3m", "fr_affichee_6m", "fr_affichee_12m", "fr_autres_classe_3m", "fr_part_classe_3m", "taille_classe",
+    "fr_age_photo_j", "it_couvert", "it_affichee_3m", "it_age_photo_j", "no_couvert", "no_nouvelle_3m",
+    "se_nouvelle_3m", "cz_nouvelle_3m", "sk_nouvelle_3m", "sig_annee_pub", "sig_cumul_pub",
+    "conso_6m_pub", "conso_tendance_6m", "conso_saison_cible",
+    "mkt_nb_specialites", "mkt_nb_presentations", "mkt_nb_titulaires", "mkt_nb_generiques", "mkt_part_injectable", "mkt_hhi_titulaires",
+    "mkt_connu", "prix_boite_pub", "prix_tendance_pub", "fr_mois_depuis_affichage", "fr_nb_episodes_publies",
+    "sig_mois_depuis_pub", "ue_critique"]
 
 
 def lire(nom):
@@ -110,12 +138,17 @@ def affichage_mensuel(episodes, substances):
     return matrice
 
 
+def sur_k_mois(matrice, k):
+    """Vrai à t si vrai à l'un des mois t-k+1, …, t."""
+    sortie = matrice.copy()
+    for decalage in range(1, k):
+        sortie[:, decalage:] |= matrice[:, :-decalage]
+    return sortie
+
+
 def sur_3_mois(matrice):
     """Vrai à t si vrai à l'un des mois t-2, t-1, t."""
-    sortie = matrice.copy()
-    sortie[:, 1:] |= matrice[:, :-1]
-    sortie[:, 2:] |= matrice[:, :-2]
-    return sortie
+    return sur_k_mois(matrice, 3)
 
 
 def autres_de_la_classe(matrice, substances):
@@ -137,7 +170,9 @@ def variables_page(evenements, substances):
     nouvelles = {f"{pays.lower()}_nouvelle_3m": sur_3_mois(presence_mensuelle(
         evenements[evenements["pays"] == pays].dropna(subset=["atc5"]), "publication", substances)) for pays in REGISTRES}
     return {"fr_affichee_3m": pages["FR"], "fr_autres_classe_3m": autres_de_la_classe(pages["FR"], substances),
-            "it_affichee_3m": pages["IT"], **nouvelles}
+            "it_affichee_3m": pages["IT"], **nouvelles,
+            "fr_affichee_6m": sur_k_mois(affichage_mensuel(evenements[evenements["pays"] == "FR"], substances), 6),
+            "fr_affichee_12m": sur_k_mois(affichage_mensuel(evenements[evenements["pays"] == "FR"], substances), 12)}
 
 
 def couvert(prefixe, mois):
@@ -146,11 +181,11 @@ def couvert(prefixe, mois):
     return np.array([(premier is None or t >= premier) and (dernier is None or t <= dernier) for t in mois])
 
 
-def matrice_conso(mensuelle, substances):
+def matrice_conso(mensuelle, substances, valeur="boites"):
     """Boîtes remboursées : matrice substances × mois (Medic'AM), et substances présentes dans Medic'AM
     (les autres, souvent réservées à l'hôpital, restent vides : ni zéro, ni imputées)."""
     par_mois = mensuelle.assign(m=mensuelle["mois"].dt.to_period("M")).pivot_table(
-        index="atc5", columns="m", values="boites", aggfunc="sum")
+        index="atc5", columns="m", values=valeur, aggfunc="sum")
     mois_c = pd.period_range(par_mois.columns.min(), par_mois.columns.max(), freq="M")
     presentes = np.array([s in par_mois.index for s in substances])
     boites = par_mois.reindex(index=substances, columns=mois_c).fillna(0).to_numpy(float)
@@ -188,6 +223,133 @@ def variables_conso(C, presentes, mois_c, mois_t):
     for tableau in sortie.values():
         tableau[~presentes] = np.nan
     return sortie
+
+
+def taille_de_classe(substances):
+    """Nombre de substances (de l'univers `tout`) dans la classe ATC4 de chaque substance."""
+    classe = np.array([s[:5] for s in substances])
+    valeurs, comptes = np.unique(classe, return_counts=True)
+    return comptes[np.searchsorted(valeurs, classe)]
+
+
+def correspondance_cis_atc5():
+    """CIS → ATC5 pour les médicaments d'hier comme d'aujourd'hui : `produits` (BDPM du jour), puis les CIP13 d'Open
+    Medic pour les médicaments retirés depuis (sinon le marché passé paraîtrait plus petit qu'il n'était)."""
+    produits = lire("produits").dropna(subset=["atc5"]).set_index("cis")["atc5"]
+    cip_atc = lire("cip_atc")
+    par_cip = (lire("bdpm_presentations_historique").merge(cip_atc[cip_atc["atc5"].str.len() == 7][["cip13", "atc5"]], on="cip13")
+               .groupby(["cis", "atc5"]).size().rename("n").reset_index().sort_values(["cis", "n"], ascending=[True, False])
+               .drop_duplicates("cis").set_index("cis")["atc5"])
+    return produits.combine_first(par_cip)
+
+
+INJECTABLE = "intraveineuse|sous-cutan|intramusculaire|intrath|intradermique|péridur|intravitr|injectable"
+VARIABLES_MARCHE = ["mkt_nb_specialites", "mkt_nb_presentations", "mkt_nb_titulaires", "mkt_nb_generiques",
+                    "mkt_part_injectable", "mkt_hhi_titulaires", "mkt_connu"]
+
+
+def versions_valides(table, fin):
+    """Versions de la dimension connues et valables à la fin du mois : vues au plus tard à `fin`, pas encore remplacées."""
+    return table[(table["valid_from"] <= fin) & (table["valid_to"].isna() | (table["valid_to"] > fin))]
+
+
+def variables_marche(substances, mois):
+    """Structure du marché de chaque substance à la fin du mois t, d'après la BDPM historisée (jointure as-of).
+    Valeur 0 et `mkt_connu` = 0 quand aucun médicament de la substance n'est rattaché à son ATC5 à cette date."""
+    cis_atc = correspondance_cis_atc5()
+    avec_atc = lambda table: table.assign(atc5=table["cis"].map(cis_atc)).dropna(subset=["atc5"])
+    specialites = lire("bdpm_specialites_historique")
+    specialites = avec_atc(specialites[specialites["commercialise"]])
+    presentations = lire("bdpm_presentations_historique")
+    presentations = avec_atc(presentations[presentations["commercialisee"]])
+    generiques = lire("bdpm_generiques_historique")
+    generiques = avec_atc(generiques[generiques["type_generique"] == "generique"])
+    specialites["injectable"] = specialites["voies"].fillna("").str.contains(INJECTABLE, regex=True)
+    ligne = {s: i for i, s in enumerate(substances)}
+    sortie = {nom: np.zeros((len(substances), len(mois))) for nom in VARIABLES_MARCHE}
+    for j, t in enumerate(mois):
+        fin = t.end_time
+        sp, pr, ge = (versions_valides(x, fin) for x in (specialites, presentations, generiques))
+        compte = lambda serie, nom: serie.reindex(substances).fillna(0).to_numpy()
+        nb = sp.groupby("atc5").size()
+        sortie["mkt_nb_specialites"][:, j] = compte(nb, "")
+        sortie["mkt_nb_presentations"][:, j] = compte(pr.groupby("atc5").size(), "")
+        sortie["mkt_nb_titulaires"][:, j] = compte(sp.groupby("atc5")["titulaires"].nunique(), "")
+        sortie["mkt_nb_generiques"][:, j] = compte(ge.groupby("atc5").size(), "")
+        injectables = compte(sp[sp["injectable"]].groupby("atc5").size(), "")
+        total = sortie["mkt_nb_specialites"][:, j]
+        sortie["mkt_part_injectable"][:, j] = np.divide(injectables, total, out=np.zeros_like(total), where=total > 0)
+        # Concentration (indice de Herfindahl) des médicaments entre titulaires : 1 = un seul titulaire.
+        parts = sp.groupby(["atc5", "titulaires"]).size()
+        parts = parts / parts.groupby(level=0).transform("sum")
+        sortie["mkt_hhi_titulaires"][:, j] = compte((parts ** 2).groupby(level=0).sum(), "")
+        sortie["mkt_connu"][:, j] = total > 0
+    return sortie
+
+
+def jours_depuis_derniere_photo(dates_photo, mois):
+    """Jours entre la fin du mois t et la dernière photo connue à cette date (plafonné : 9999 s'il n'y en a pas encore)."""
+    dates = np.sort(pd.to_datetime(pd.Series(dates_photo)).unique())
+    fins = np.array([t.end_time.normalize().to_datetime64() for t in mois])
+    indice = np.searchsorted(dates, fins, side="right") - 1
+    age = (fins - dates[np.clip(indice, 0, None)]) / np.timedelta64(1, "D")
+    return np.where(indice < 0, 9999, age).astype("int16")
+
+
+VARIABLES_PRIX = ["prix_boite_pub", "prix_tendance_pub"]
+
+
+def variables_prix(B, C, mois_c, mois_t):
+    """Prix moyen d'une boîte (base de remboursement / boîtes) sur le dernier semestre publié de Medic'AM, et son
+    évolution sur un an (rapport au même semestre de l'année précédente ; 1 si l'un des deux est inconnu). Un prix
+    bas ou en baisse est un facteur de pénurie connu (génériques peu rentables). Même règle de publication que la
+    consommation : rien après le dernier mois publié."""
+    sortie = {nom: np.zeros((C.shape[0], len(mois_t))) for nom in VARIABLES_PRIX}
+    for j, t in enumerate(mois_t):
+        fin = int((dernier_mois_publie(t) - mois_c[0]).n)
+        b, c = B[:, fin - 5:fin + 1].sum(axis=1), C[:, fin - 5:fin + 1].sum(axis=1)
+        b0, c0 = B[:, fin - 17:fin - 11].sum(axis=1), C[:, fin - 17:fin - 11].sum(axis=1)
+        prix = np.divide(b, c, out=np.zeros_like(b), where=c > 0)
+        avant = np.divide(b0, c0, out=np.zeros_like(b0), where=c0 > 0)
+        sortie["prix_boite_pub"][:, j] = prix
+        sortie["prix_tendance_pub"][:, j] = np.divide(prix, avant, out=np.ones_like(prix), where=(prix > 0) & (avant > 0))
+    return sortie
+
+
+PLAFOND_MOIS = 99  # « jamais vu depuis le début de la source » pour les variables de récence
+
+
+def mois_depuis_vrai(matrice):
+    """Pour chaque case : mois écoulés depuis le dernier mois vrai (0 si vrai ce mois-ci), PLAFOND_MOIS sinon."""
+    indices = np.arange(matrice.shape[1])[None, :]
+    dernier = np.maximum.accumulate(np.where(matrice, indices, -1), axis=1)
+    return np.where(dernier >= 0, indices - dernier, PLAFOND_MOIS)
+
+
+def mois_depuis_signalement_publie(signalements, substances, mois):
+    """Mois entre t et le dernier signalement ANSM d'une année déjà publiée à t (PLAFOND_MOIS s'il n'y en a pas)."""
+    dates = {a: np.sort(g.dt.to_period("M").astype("int64").to_numpy()) for a, g in signalements.groupby("atc5")["date_signalement"]}
+    sortie = np.full((len(substances), len(mois)), PLAFOND_MOIS, dtype="int16")
+    annees = derniere_annee_publiee(np.array([t.year for t in mois]), np.array([t.month for t in mois]))
+    bornes = np.array([pd.Period(f"{a}-12", "M").ordinal for a in annees])
+    ordinaux = np.array([t.ordinal for t in mois])
+    for i, s in enumerate(substances):
+        d = dates.get(s)
+        if d is None or not len(d):
+            continue
+        k = np.searchsorted(d, bornes, side="right") - 1
+        ok = k >= 0
+        sortie[i, ok] = np.minimum(ordinaux[ok] - d[k[ok]], PLAFOND_MOIS)
+    return sortie
+
+
+def episodes_fr_publies(evenements, substances, mois):
+    """Nombre cumulé d'épisodes de pénurie publiés sur la page ANSM (depuis 2015) jusqu'à la fin du mois t."""
+    fr = evenements[(evenements["pays"] == "FR")].dropna(subset=["atc5", "publication"])
+    debut = min(fr["publication"].min().to_period("M"), mois[0])
+    colonnes = pd.period_range(debut, mois[-1], freq="M")
+    comptes = pd.crosstab(fr["atc5"], fr["publication"].dt.to_period("M")).reindex(index=substances, columns=colonnes, fill_value=0)
+    return comptes.cumsum(axis=1)[list(mois)].to_numpy()
 
 
 def derniere_annee_publiee(annee, mois_num):
@@ -235,7 +397,8 @@ def construire():
 
     # Pénuries publiées : France couverte sur tout le panel ; Italie et Norvège à 0 hors couverture,
     # avec leur indicateur de couverture.
-    for nom, matrice in variables_page(evenements, tout).items():
+    pages = variables_page(evenements, tout)
+    for nom, matrice in pages.items():
         type_entier = "int16" if nom == "fr_autres_classe_3m" else "int8"
         valeurs = matrice[lignes][:, DEBUT:T].astype(type_entier)
         if nom[:2] in COUVERTURE:
@@ -243,6 +406,24 @@ def construire():
             valeurs = valeurs * masque
             table[f"{nom[:2]}_couvert"] = np.tile(masque, len(avec)).astype("int8")
         table[nom] = valeurs.ravel()
+    # Q1 normalisée : le compte brut des autres substances affichées croît avec la taille de la classe.
+    taille = taille_de_classe(tout)
+    autres = pages["fr_autres_classe_3m"].astype(float)
+    part = np.divide(autres, (taille - 1)[:, None], out=np.zeros_like(autres), where=(taille > 1)[:, None])
+    table["taille_classe"] = np.repeat(taille[lignes], nT).astype("int16")
+    table["fr_part_classe_3m"] = part[lignes][:, DEBUT:T].clip(0, 1).ravel().astype("float32").round(4)
+    # Fraîcheur des archives à la fin du mois t (la page n'est connue qu'à la dernière photo).
+    photos_fr = lire("ansm_observations")["date_photo"]
+    europe = lire("europe_observations")
+    table["fr_age_photo_j"] = np.tile(jours_depuis_derniere_photo(photos_fr, mois), len(avec))
+    table["it_age_photo_j"] = np.tile(jours_depuis_derniere_photo(europe.loc[europe["pays"] == "IT", "date_photo"], mois), len(avec))
+    # Récence et historique publiés (variables « months_since_last_shortage » et « prior_episode_count » des modèles
+    # de référence) : depuis la page ANSM (publiée en continu) et les signalements des années déjà publiées.
+    fr_page = affichage_mensuel(evenements[evenements["pays"] == "FR"], tout)
+    table["fr_mois_depuis_affichage"] = mois_depuis_vrai(fr_page)[lignes][:, DEBUT:T].ravel().astype("int16")
+    table["fr_nb_episodes_publies"] = episodes_fr_publies(evenements, avec, mois).ravel().astype("int16")
+    table["sig_mois_depuis_pub"] = mois_depuis_signalement_publie(signalements, avec, mois).ravel()
+    table["semestre"] = pd.Categorical(table["mois"].dt.year.astype(str) + "S" + np.where(table["mois"].dt.month <= 6, "1", "2"))
 
     # Signalements des années déjà publiées (dernière année publiée, et cumul jusqu'à elle)
     par_annee = (signalements.groupby(["atc5", "annee"]).size().unstack(fill_value=0)
@@ -253,18 +434,33 @@ def construire():
     table["sig_annee_pub"] = par_annee.to_numpy()[base, a_pub].astype("int32")
     table["sig_cumul_pub"] = cumul.to_numpy()[base, a_pub].astype("int32")
 
+    # Nouvelles pénuries sans fuite de définition : « calme » avec ce qui est publié à la fin du mois t.
+    for k in CALME:
+        publie = (table[f"fr_affichee_{k}m"] == 0) & (table["sig_annee_pub"] == 0)
+        table[f"calme_pub_{k}m"] = publie.astype("int8")
+        table[f"cible_nouvelle_pub_{k}m"] = (table["cible"].astype(bool) & publie).astype("int8")
+
+    # Structure du marché (BDPM historisée)
+    for nom, matrice in variables_marche(avec, mois).items():
+        table[nom] = matrice.ravel().astype("float32" if nom in ("mkt_part_injectable", "mkt_hhi_titulaires") else "int32")
+
     # Demande mensuelle (Medic'AM, 2015 à 06/2026) : niveau, tendance et saison, sur les semestres déjà publiés
     C, presentes, mois_c = matrice_conso(mensuelle, tout)
     for nom, matrice in variables_conso(C, presentes, mois_c, mois).items():
         valeurs = matrice[lignes].ravel()
         table[nom] = valeurs.astype("int64") if nom == "conso_6m_pub" else valeurs.round(4).astype("float32")
 
+    # Prix (base de remboursement par boîte, Medic'AM) sur le dernier semestre publié
+    B, _, _ = matrice_conso(mensuelle, tout, "base_remboursement")
+    for nom, matrice in variables_prix(B, C, mois_c, mois).items():
+        table[nom] = matrice[lignes].ravel().round(4).astype("float32")
+
     # Criticité : substance inscrite à la liste critique de l'UE à la fin du mois t
     ue = lire("ue_liste_critique").drop_duplicates("atc5").set_index("atc5")["date_inscription"]
     inscrite = table["atc5"].map(ue)
     table["ue_critique"] = (inscrite <= table["mois"] + pd.offsets.MonthEnd(0)).fillna(False).astype("int8")
 
-    table = table.sort_values(["atc5", "mois"], ignore_index=True)
+    table = table[ORDRE_COLONNES].sort_values(["atc5", "mois"], ignore_index=True)
     FINAL.mkdir(parents=True, exist_ok=True)
     enregistrer(table, "panel_fr", dossier=FINAL)
     controler(table, avec, evenements, tout, C, presentes, mois_c)
@@ -343,6 +539,64 @@ def controler(table, avec, evenements, tout, C, presentes, mois_c):
     for nom in complet:
         egal = np.array_equal(complet[nom][lignes][:, index_t0], partiel[nom][lignes][:, index_t0])
         verifier(f"{nom} au mois {t0} ne lit rien de postérieur", egal, "valeur différente après troncature")
+
+    # Variables ajoutées : cohérence et recalcul indépendant.
+    verifier("colonnes du panel = ordre documenté", list(table.columns) == ORDRE_COLONNES, "colonnes différentes")
+    for k in CALME:
+        publie = (table[f"fr_affichee_{k}m"] == 0) & (table["sig_annee_pub"] == 0)
+        verifier(f"calme_pub_{k}m = ni affichée {k} mois, ni signalée l'année publiée",
+                 (table[f"calme_pub_{k}m"] == publie.astype("int8")).all(), "écart")
+        verifier(f"cible_nouvelle_pub_{k}m = cible sur les lignes calmes publiées",
+                 (table[f"cible_nouvelle_pub_{k}m"] == table["cible"] * table[f"calme_pub_{k}m"]).all(), "écart")
+    verifier("fenêtres d'affichage emboîtées (3 ≤ 6 ≤ 12 mois)", ((table["fr_affichee_3m"] <= table["fr_affichee_6m"])
+             & (table["fr_affichee_6m"] <= table["fr_affichee_12m"])).all(), "fenêtre non emboîtée")
+    classes = pd.Series(tout).str[:5].value_counts()
+    taille = table["atc5"].str[:5].map(classes)
+    verifier("taille_classe = substances de la classe ATC4", (table["taille_classe"] == taille).all(), "écart")
+    attendu = np.where(taille > 1, table["fr_autres_classe_3m"] / (taille - 1).clip(lower=1), 0)
+    verifier("fr_part_classe_3m = autres affichées / (taille - 1), dans [0, 1]",
+             np.allclose(table["fr_part_classe_3m"], attendu, atol=1e-3) and table["fr_part_classe_3m"].between(0, 1).all(), "écart")
+    verifier("âge de la dernière photo ≥ 0", (table[["fr_age_photo_j", "it_age_photo_j"]] >= 0).all().all(), "âge négatif")
+    t0 = pd.Period("2024-06", "M")
+    sp = lire("bdpm_specialites_historique")
+    sp = sp[sp["commercialise"] & (sp["valid_from"] <= t0.end_time) & (sp["valid_to"].isna() | (sp["valid_to"] > t0.end_time))]
+    attendu = sp["cis"].map(correspondance_cis_atc5()).value_counts()
+    juin = table[table["mois"] == t0.to_timestamp()].set_index("atc5")
+    verifier("mkt_nb_specialites au mois 2024-06 = recalcul sur la BDPM historisée",
+             (juin["mkt_nb_specialites"] == attendu.reindex(juin.index).fillna(0).astype(int)).all(), "écart")
+    verifier("mkt_nb_titulaires ≤ mkt_nb_specialites et part d'injectables dans [0, 1]",
+             (table["mkt_nb_titulaires"] <= table["mkt_nb_specialites"]).all() and table["mkt_part_injectable"].between(0, 1).all(), "incohérent")
+    part_connue = table["mkt_connu"].mean()
+    verifier(f"substances × mois avec un marché rattaché à l'ATC5 : {part_connue:.1%} (seuil 90 %)", part_connue >= 0.90,
+             f"{part_connue:.1%}")
+
+    # Récence : recalcul indépendant sur un échantillon.
+    sig_pub = lire("ansm_signalements").dropna(subset=["atc5"])
+    echantillon = table.sample(1000, random_state=3)
+    attendu = []
+    for a, t in zip(echantillon["atc5"], echantillon["mois"]):
+        t = t.to_period("M")
+        limite = int(derniere_annee_publiee(np.array([t.year]), np.array([t.month]))[0])
+        passees = sig_pub.loc[(sig_pub["atc5"] == a) & (sig_pub["annee"] <= limite), "date_signalement"]
+        attendu.append(PLAFOND_MOIS if passees.empty else min((t - passees.max().to_period("M")).n, PLAFOND_MOIS))
+    verifier("sig_mois_depuis_pub = mois depuis le dernier signalement publié (recalcul)",
+             list(echantillon["sig_mois_depuis_pub"]) == attendu, "écart")
+    verifier("fr_mois_depuis_affichage = 0 exactement quand la substance est affichée ce mois-ci",
+             ((table["fr_mois_depuis_affichage"] == 0) <= (table["fr_affichee_3m"] == 1)).all(), "incohérent")
+    verifier("mkt_hhi_titulaires dans [0, 1], égal à 1 avec un seul titulaire, entre 1/n et 1 sinon",
+             table["mkt_hhi_titulaires"].between(0, 1.0001).all()
+             and np.allclose(table.loc[table["mkt_nb_titulaires"] == 1, "mkt_hhi_titulaires"], 1)
+             and (table.loc[table["mkt_nb_titulaires"] > 1, "mkt_hhi_titulaires"]
+                  >= 1 / table.loc[table["mkt_nb_titulaires"] > 1, "mkt_nb_titulaires"] - 1e-4).all(), "incohérent")
+    for t0 in (pd.Period("2024-06", "M"), pd.Period("2025-02", "M")):
+        fin = dernier_mois_publie(t0)
+        Bm, _, _ = matrice_conso(lire("consommation_mensuelle"), tout, "base_remboursement")
+        abime_b, abime_c = Bm.copy(), C.copy()
+        abime_b[:, int((fin - mois_c[0]).n) + 1:] = 1e9
+        abime_c[:, int((fin - mois_c[0]).n) + 1:] = 7
+        vrai, faux = variables_prix(Bm, C, mois_c, [t0]), variables_prix(abime_b, abime_c, mois_c, [t0])
+        for nom in VARIABLES_PRIX:
+            verifier(f"{nom} au mois {t0} ne lit rien après {fin}", np.allclose(vrai[nom], faux[nom]), "valeur modifiée")
 
     # Consommation mensuelle : recalcul indépendant, puis test de non-fuite par perturbation.
     mensuelle = lire("consommation_mensuelle").set_index(["atc5", "mois"])["boites"]

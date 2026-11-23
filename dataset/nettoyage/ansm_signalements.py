@@ -29,6 +29,15 @@ COLONNES = {
     "Spécialité": "medicament", "Nom": "medicament", "CIP": "cip13", "DCI": "dci",
 }
 CIP13 = re.compile(r"3400\d{9}")
+# Formes juridiques et mots de raison sociale écartés pour regrouper « Sandoz SAS » et « SANDOZ » : seul le nom
+# de marque reste. Les fusions de groupes (Mylan → Viatris) ne sont pas faites : elles demandent une source.
+MOTS_SOCIAUX = {"sas", "sa", "sarl", "sasu", "france", "sante", "laboratoire", "laboratoires", "lab", "labo",
+                "gmbh", "ltd", "limited", "ag", "bv", "nv", "spa", "pharma", "generiques", "generique", "genericos"}
+
+
+def laboratoire_normalise(nom):
+    mots = [m for m in normaliser_texte(nom).split() if m not in MOTS_SOCIAUX]
+    return " ".join(mots) or normaliser_texte(nom) or None
 
 
 def lire_classeur(chemin):
@@ -96,12 +105,18 @@ def construire():
     combinaisons[["cis", "atc5", "methode_rapprochement"]] = resultats
     table = table.merge(combinaisons, on=cles, how="left")
 
+    table["laboratoire_norm"] = table["laboratoire"].map(laboratoire_normalise)
+    # Une ligne identique à une ligne précédente (même date, laboratoire, CIP, nom, DCI) n'est pas supprimée (deux
+    # boîtes signalées le même jour se ressemblent) : elle est repérée, pour compter sans elle si besoin.
+    table["ligne_repetee"] = table.duplicated(["date_signalement", "laboratoire", "cip13", "medicament", "dci"])
     table.insert(1, "annee", table["date_signalement"].dt.year)
     table = table.sort_values("date_signalement", kind="stable").reset_index(drop=True)
-    table = table[["date_signalement", "annee", "laboratoire", "cip13", "medicament", "dci",
-                   "cis", "atc5", "methode_rapprochement"]].astype({"laboratoire": object, "medicament": object,
+    table = table[["date_signalement", "annee", "laboratoire", "laboratoire_norm", "cip13", "medicament", "dci",
+                   "cis", "atc5", "methode_rapprochement", "ligne_repetee"]].astype({"laboratoire": object, "medicament": object,
                                                                      "dci": object, "cip13": object})
     enregistrer(table, "ansm_signalements")
+    print(f"  laboratoires : {table['laboratoire'].nunique()} libellés → {table['laboratoire_norm'].nunique()} normalisés ;"
+          f" lignes répétées : {int(table['ligne_repetee'].sum())}")
     print("  signalements par année :", table["annee"].value_counts().sort_index().to_dict())
     print("  rapprochement ATC des signalements :",
           table["methode_rapprochement"].value_counts(dropna=False).to_dict())

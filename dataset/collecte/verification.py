@@ -8,6 +8,15 @@ from .commun import MANIFESTE, RAW, lire_manifeste, sha256
 
 # .DS_Store : fichiers créés par le Finder de macOS à l'ouverture d'un dossier.
 IGNORES = {MANIFESTE.name, "_captures.json", ".DS_Store"}
+# Fichiers tracés dans le manifeste mais volontairement absents du disque : essais de collecte remplacés ou
+# hors périmètre. Toute autre absence arrête la vérification.
+OBSOLETES = {
+    "dmp/legemiddelmangel_2017.xls", "dmp/legemiddelmangel_2018.xls",  # classeurs avant 2019, hors panel (début 2020)
+    "medicam/MEDICAM_2019_annuel.zip", "medicam/MEDICAM_2022_s1.csv",  # premières tentatives, renommées en .xls / .zip
+    # Historique suédois du 09/11/2026, effacé du disque le 21/11 ; retéléchargé le 23/11/2026 (le nettoyage lit
+    # la photo du dernier jour de collecte, donc les fichiers du 23/11).
+    "lakemedelsverket/2026-11-09_opendata-medicine-shortages-historic-3-0.xml",
+}
 
 
 def verifier():
@@ -25,6 +34,11 @@ def verifier():
             problemes.append(f"absent du manifeste : {relatif}")
         elif sha256(chemin.read_bytes()) != empreintes[relatif]:
             problemes.append(f"empreinte différente du manifeste : {relatif}")
+    # Un fichier tracé dans le manifeste mais absent du disque (effacé, déplacé) fausse les tables sans erreur :
+    # par exemple, sans l'historique suédois, la Suède passe de 15 886 à 2 422 épisodes.
+    for relatif in sorted(empreintes):
+        if relatif not in OBSOLETES and not (RAW / relatif).is_file():
+            problemes.append(f"tracé dans le manifeste mais absent du disque : {relatif}")
     if problemes:
         raise SystemExit(f"Couche brute non conforme ({len(problemes)} problème(s)) :\n  "
                          + "\n  ".join(problemes[:20]))

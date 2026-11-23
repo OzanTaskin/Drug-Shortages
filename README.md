@@ -10,6 +10,7 @@ les méthodes vues en cours.
 | [livrables/livrable1/build/Rapport-DALAS-Deliverable1.pdf](livrables/livrable1/build/Rapport-DALAS-Deliverable1.pdf) | **le rapport du livrable 1** (2 pages) : questions, collecte, description quantitative, prétraitement |
 | [dashboard/README.md](dashboard/README.md) | **le dashboard du livrable 2** : lancement en trois commandes, les sept vues |
 | [livrables/livrable2/Plan-DALAS-Deliverable2.pdf](livrables/livrable2/Plan-DALAS-Deliverable2.pdf) | le plan du livrable 2 (rédigé avant l'ajout de 4 pays) |
+| [dataset/DICTIONNAIRE.md](dataset/DICTIONNAIRE.md) | **le dictionnaire des données** : chaque table, chaque colonne, quoi utiliser et quoi éviter |
 | [dataset/EXPLICATIONS.md](dataset/EXPLICATIONS.md) | **l'explication détaillée** : chaque source, chaque table, chaque choix, et pourquoi, au regard des cours ; la suite du projet |
 | [dataset/CHANGELOG_DATA.md](dataset/CHANGELOG_DATA.md) | une ligne par changement des données : date, auteur, quoi, pourquoi |
 | `dataset/manifestes/` | l'état exact des tables à chaque construction de référence (lignes, sommes, empreintes) |
@@ -30,16 +31,16 @@ qui ne sont jamais en pénurie. L'Italie, l'Allemagne, la Norvège, la Suède, l
 | Étape | Statut |
 |---|---|
 | Niveau 1 : collecte des sources brutes | ✅ environ 800 fichiers, environ 870 Mo, empreintes vérifiées ; ancien site de l'ANSM (2015-2021), Italie depuis 2019, registres de Norvège (2019-2024), Suède et Tchéquie (depuis 2018), Slovaquie (depuis 04/2019) |
-| Niveau 2 : tables nettoyées | ✅ 25 tables, dont `shortage_events` (72 221 épisodes FR/IT/DE/NO/SE/CZ/SK) et `ansm_signalements` (22 501 signalements 2019-2025) ; contrôles automatiques |
+| Niveau 2 : tables nettoyées | ✅ 26 tables (dont `couverture_mensuelle`), dont `shortage_events` (72 565 épisodes FR/IT/DE/NO/SE/CZ/SK) et `ansm_signalements` (22 501 signalements 2019-2025) ; contrôles automatiques |
 | Livrable 1 : rapport de 2 pages | ✅ `livrables/livrable1/` |
 | Consommation mensuelle (Medic'AM) | ✅ `consommation_mensuelle` : 1 560 substances × 138 mois (01/2015 à 06/2026) ; 3 variables dans `panel_fr` |
-| Niveau 3 : table d'entraînement `panel_fr` | ✅ **complète, sans valeur vide** : 58 410 lignes × 25 colonnes (885 substances délivrées en ville × 66 mois, 04/2020 à 09/2025), cible (et cible des nouvelles pénuries, sur les substances calmes depuis 6 ou 12 mois), 17 variables et 2 indicateurs de couverture (Italie, Norvège), découpage temporel ; contrôles anti-fuite (recalcul, perturbation) ; voir [dataset/EXPLICATIONS.md](dataset/EXPLICATIONS.md), section 6 |
+| Niveau 3 : table d'entraînement `panel_fr` | ✅ **complète, sans valeur vide** : 58 410 lignes × 48 colonnes (885 substances délivrées en ville × 66 mois, 04/2020 à 09/2025), cible (et cible des nouvelles pénuries, sur les substances calmes depuis 6 ou 12 mois), 17 variables et 2 indicateurs de couverture (Italie, Norvège), découpage temporel ; contrôles anti-fuite (recalcul, perturbation) ; voir [dataset/EXPLICATIONS.md](dataset/EXPLICATIONS.md), section 6 |
 | Livrable 2 : dashboard | ✅ `dashboard/` : application Dash, 7 vues, lancée par `python dashboard/app.py` sans les données brutes |
 | TME9 : rapport final | ⏳ |
 
 ## Lancer le code
 
-Les données ne sont **pas** sur GitHub (environ 870 Mo) : elles se régénèrent avec le code. Il faut
+Les tables nettoyées (`dataset/data/clean/`, 20 Mo) et le panel (`dataset/data/final/`) **sont sur GitHub** : on peut les lire sans rien régénérer. Seules les données brutes (environ 900 Mo) n'y sont pas : elles se régénèrent avec le code. Il faut
 Python 3.11 ou plus récent (pandas 3 l'exige). Testé avec Python 3.14 et pandas 3.0 et 3.1.
 L'environnement Python est à la racine ; **le code se lance depuis le dossier `dataset/`**.
 
