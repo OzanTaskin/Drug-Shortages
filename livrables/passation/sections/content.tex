@@ -1,0 +1,64 @@
+\textbf{Pourquoi ce document.} Ta dernière contribution date du 15/10 (signalements ANSM, épisodes européens, retrait de l'Espagne).
+Depuis, le dataset, le panel et le dashboard ont beaucoup changé. Ce document te permet de reprendre le projet : récupérer le code,
+comprendre ce qui a changé et pourquoi, connaître les règles à respecter, et savoir ce qui reste à faire.
+
+\section{1. Récupérer le travail et le faire tourner}
+Tout est sur la branche \var{ozan} (l'ancienne organisation de ta branche est remplacée par \var{dataset/} et \var{livrables/}).
+Les données (870\,Mo) ne sont pas sur GitHub : elles se régénèrent. Python 3.11 ou plus récent (pandas 3).
+\begin{Verbatim}[fontsize=\small, frame=single, rulecolor=\color{gris!50}, framesep=2pt]
+git fetch origin && git checkout -b rahim-suite origin/ozan      # ta branche de travail, partie de ozan
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cd dataset                                                       # tout se lance depuis dataset/
+../.venv/bin/python -m collecte     # niveau 1 : environ 15 min, relançable ; vérifie les empreintes
+../.venv/bin/python -m nettoyage    # niveau 2 (25 tables) puis niveau 3 (panel_fr), environ 1 min
+cd .. && .venv/bin/python dashboard/app.py                       # dashboard sur http://127.0.0.1:8050
+\end{Verbatim}
+Le dashboard n'a pas besoin de \var{dataset/data/} (4\,Mo de résumés versionnés). Les sources évoluent : relancer plus tard donne
+des chiffres légèrement différents ; le manifeste (\var{dataset/manifestes/}) dit si un écart vient du code ou des données.
+
+\section{2. Ce qui a changé depuis le 15 octobre}
+\begin{tabularx}{\linewidth}{@{}p{1.6cm}X@{}}
+\rowcolor{gris!14}\entete{Date} & \entete{Changement (et pourquoi)}\\
+22/10 & \textbf{Audit de fiabilité} : empreinte de chaque fichier, 79 contrôles automatiques, versions passées de la BDPM (marché tel qu'il était à chaque date), règle « pas de futur ». \\
+26/10--01/11 & \textbf{Livrable 1} réécrit ; première table finale \var{panel\_fr} (substance $\times$ mois, cible = signalement dans les 3 mois, découpage temporel). \\
+09/11 & \textbf{Consommation mensuelle} (Medic'AM, 2015--2026) à la place du seul Open Medic annuel : saisonnalité et tendance de la demande. \\
+09/11 & \textbf{Fuites corrigées} : des variables annuelles lisaient des années pas encore publiées (26 à 29\,\% des lignes). Désormais, une variable ne lit que ce qui était publié à la fin du mois, avec un test de non-fuite. \\
+09/11 & \textbf{Passé complété} : ancien site de l'ANSM (52 archives, 2015--2021) et mois manquants ; la France est couverte depuis 2015. \\
+09/11 & \textbf{4 pays ajoutés} : Norvège, Suède, Tchéquie, Slovaquie (registres avec historique, date de publication et ATC) : 7 pays, 72\,221 pénuries. \\
+09/11 & \textbf{Panel final} : 58\,410 lignes (885 substances $\times$ 66 mois), sans case vide ; indicateurs de couverture (\var{it\_couvert}, \var{no\_couvert}). \\
+09/11 & \textbf{Audit critique} : la cible était trop facile ; ajout de la cible « nouvelles pénuries » (\var{cible\_nouvelle\_12m}). \\
+09/11 & \textbf{Dashboard} (livrable 2) : Dash, 7 vues ; dossier rangé en \var{dataset/} et \var{livrables/}. \\
+\end{tabularx}
+Le détail ligne par ligne est dans \var{dataset/CHANGELOG\_DATA.md} ; le raisonnement complet dans \var{dataset/EXPLICATIONS.md}.
+
+\section{3. Les règles du projet (à ne pas casser)}
+\begin{itemize}
+\item \textbf{Jamais de futur} : une variable à la date $t$ n'utilise que ce qui était \emph{publié} à la fin du mois $t$ (voir \var{EXPLICATIONS.md}, section 5.3).
+\item \textbf{Brut en lecture seule} : \var{data/raw/} n'est jamais modifié ; un fichier altéré arrête la collecte.
+\item \textbf{Un changement de données = une ligne} dans \var{CHANGELOG\_DATA.md}, et le manifeste se commite après chaque construction de référence.
+\item \textbf{Découpage temporel} : entraînement 04/2020--09/2023, validation 2024, test 2025, avec un écart de 3 mois ; jamais aléatoire.
+\item \textbf{Cible nouvelle} : \var{calme\_12m}, \var{cible\_nouvelle\_*} lisent les vraies dates : ce sont des définitions, jamais des variables du modèle.
+\end{itemize}
+
+\section{4. Où en sont les résultats}
+97\,\% des positifs 2025 concernent une substance déjà signalée (le cumul des signalements seul : AUC 0,852). Sur les substances
+calmes depuis 12 mois (27\,718 lignes, 9,1\,\% de positives ; 84 nouvelles ruptures distinctes au test) : AUC 0,683 sans signaux
+européens, 0,702 avec (+0,019, IC 95\,\% [0,002 ; 0,037]), surtout l'Italie (Q2). Q1 (cascade) : rien de visible. Les modèles simples
+valent les complexes. Le script \var{dataset/analyse/comparaison\_modeles.py} (logistique, forêt, boosting, MLP) est écrit mais
+\textbf{pas encore exécuté} :
+{\small\texttt{../.venv/bin/python analyse/comparaison\_modeles.py data/final/panel\_fr.parquet}} (depuis \var{dataset/}).
+
+\section{5. Ce qui reste à faire (proposition de répartition)}
+\begin{tabularx}{\linewidth}{@{}Xp{3.3cm}@{}}
+\rowcolor{gris!14}\entete{Tâche} & \entete{Proposé}\\
+Exécuter et valider la comparaison de modèles ; métriques pour classes rares (précision, rappel, F1, courbe précision-rappel) & à décider \\
+Régression sur la durée des pénuries (autre famille de méthodes du cours) & à décider \\
+Approfondir Q1 (cascade par classe ATC4) : le signal est-il vraiment nul ou masqué ? & à décider \\
+Relire et tester le dashboard sur une machine propre (venv neuf) & Rahim \\
+Rapport final (TME9) : plan, figures, résultats & les deux \\
+\end{tabularx}
+
+\section{6. Pièges déjà rencontrés}
+Archives Wayback tronquées à 1\,Mio (écartées au nettoyage) ; Open Medic refuse les téléchargements simultanés ; le code se lance depuis le
+dossier \var{dataset} ; pas d'historique pour la plupart des pays européens (voir la liste des pays écartés dans \var{EXPLICATIONS.md}) ; une
+« pénurie » n'a pas la même définition d'un pays à l'autre ; seulement 84 nouvelles ruptures au test, donc une marge d'erreur large.

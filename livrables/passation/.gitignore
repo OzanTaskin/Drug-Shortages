@@ -1,0 +1,5 @@
+# Versionnés : sources LaTeX et PDF compilé.
+build/*
+!build/Rapport-DALAS-MiseAJour.pdf
+.vscode/
+.DS_Store

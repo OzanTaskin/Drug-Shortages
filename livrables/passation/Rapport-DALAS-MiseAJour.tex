@@ -1,0 +1,32 @@
+\documentclass[10pt, a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[french]{babel}
+\usepackage{lmodern}
+\usepackage{geometry}
+\geometry{margin=1.7cm, top=1.2cm, bottom=1.4cm}
+\usepackage{parskip}
+\setlength{\parskip}{0.4\baselineskip plus 1pt minus 1pt}
+\usepackage{enumitem}
+\setlist{itemsep=0pt, parsep=0pt, topsep=1pt}
+\frenchsetup{ItemLabels=\textbullet}
+\setlist[itemize]{label=\textbullet}
+\usepackage{booktabs,tabularx,caption,graphicx,float,fancyvrb}
+\usepackage[table]{xcolor}
+\definecolor{gris}{HTML}{6B7280}
+\definecolor{bleu}{HTML}{2A78D6}
+\newcommand{\entete}[1]{\textbf{\color{gris!20!black}#1}}
+\newcommand{\var}[1]{\texttt{\color{gris!30!black}#1}}
+\usepackage{titlesec}
+\titleformat{\section}{\normalsize\bfseries\color{bleu!80!black}}{}{0em}{}
+\titlespacing*{\section}{0pt}{1.6ex plus 0.3ex}{0.6ex}
+\usepackage{hyperref}
+\hypersetup{colorlinks=true, linkcolor=black, urlcolor=blue}
+\pagestyle{empty}
+\sloppy\emergencystretch=2em
+\input{frontmatter/metadata}
+\begin{document}
+\maketitle
+\vspace{0.5ex}
+\input{sections/content}
+\end{document}
