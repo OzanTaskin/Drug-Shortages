@@ -1,0 +1,154 @@
+"""Faisabilité du projet, chiffrée sur la table d'entraînement `panel_fr` (niveau 3).
+
+Usage :
+    python -m nettoyage panel      # construit data/final/panel_fr.parquet
+    python -m analyse.faisabilite
+
+Trois questions avant toute modélisation :
+- la cible est-elle observable, avec assez de cas positifs, et comment évolue-t-elle ? ;
+- Q1 (cascade) : combien de lignes sont exposées à une pénurie affichée dans la même classe ATC4 ? ;
+- Q2 (importation) : combien de lignes sont exposées à une pénurie affichée en Italie, ou à une nouvelle déclaration
+  en Norvège ? Chaque signal n'est compté que sur les mois couverts par sa source (`it_couvert`, `no_couvert`).
+  (L'Allemagne n'a que 13 mois d'archives : hors du panel complet.)
+Les taux avec et sans exposition sont des repères bruts, pas des résultats : ils ne tiennent pas compte
+de la taille des classes, de la consommation ni de la hausse générale des signalements.
+"""
+from pathlib import Path
+
+import pandas as pd
+
+PANEL = Path(__file__).resolve().parent.parent / "data" / "final" / "panel_fr.parquet"
+
+EXPOSITIONS = {  # nom : (colonne, exposée si, colonne de couverture ou None)
+    "Q1 cascade : autres substances de la classe affichées": ("fr_autres_classe_3m", lambda x: x > 0, None),
+    "Q2 Italie : même substance affichée": ("it_affichee_3m", lambda x: x > 0, "it_couvert"),
+    "Q2 Norvège : même substance déclarée": ("no_nouvelle_3m", lambda x: x > 0, "no_couvert"),
+    "Q2 Suède : même substance déclarée": ("se_nouvelle_3m", lambda x: x > 0, None),
+    "Q2 Tchéquie : même substance déclarée": ("cz_nouvelle_3m", lambda x: x > 0, None),
+    "Q2 Slovaquie : même substance déclarée": ("sk_nouvelle_3m", lambda x: x > 0, None),
+    "Contrôle : même substance affichée en France": ("fr_affichee_3m", lambda x: x > 0, None),
+}
+
+
+def calculer():
+    panel = pd.read_parquet(PANEL)
+    resultat = {"lignes": len(panel), "substances": int(panel["atc5"].nunique()), "mois": int(panel["mois"].nunique()),
+                "positives": int(panel["cible"].sum()), "taux": float(panel["cible"].mean())}
+    resultat["jeux"] = {jeu: {"lignes": len(g), "positives": int(g["cible"].sum()), "taux": float(g["cible"].mean())}
+                        for jeu, g in panel.groupby("jeu", observed=True)}
+    resultat["expositions"] = {}
+    for nom, (colonne, regle, couverture) in EXPOSITIONS.items():
+        observe = panel if couverture is None else panel[panel[couverture] == 1]
+        exposee = regle(observe[colonne])
+        resultat["expositions"][nom] = {
+            "mois_couverts": int(observe["mois"].nunique()), "lignes": len(observe), "part_exposee": float(exposee.mean()),
+            "positives_si_exposee": float(observe.loc[exposee, "cible"].mean()),
+            "positives_sinon": float(observe.loc[~exposee, "cible"].mean())}
+    return resultat
+
+
+def facteurs():
+    """Q1 et Q2 contrôlées : régression logistique entraînée sur la période d'entraînement, évaluée sur le test (2025),
+    avec les variables de base (consommation, tendance et saison de la demande, signalements des années publiées,
+    liste critique, substance déjà affichée) puis avec la variable de Q1 ou de Q2. Un écart d'AUC dit ce que le signal apporte de plus."""
+    import numpy as np
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import average_precision_score, roc_auc_score
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    t = pd.read_parquet(PANEL)
+    t = t[t["jeu"] != "ecart"].copy()
+    for entree, sortie in [("conso_6m_pub", "conso"), ("sig_annee_pub", "sig"), ("sig_cumul_pub", "sig_cumul")]:
+        t[sortie] = np.log1p(t[entree].astype("float64"))
+    t["tendance"], t["saison"] = np.log(t["conso_tendance_6m"].astype("float64")), np.log(t["conso_saison_cible"].astype("float64"))
+    for c in ["fr_affichee_3m", "fr_autres_classe_3m", "it_affichee_3m", "it_couvert", "no_nouvelle_3m", "no_couvert", "se_nouvelle_3m", "cz_nouvelle_3m", "sk_nouvelle_3m"]:
+        t[c] = t[c].astype("float64")
+    base = ["conso", "tendance", "saison", "ue_critique", "sig", "sig_cumul", "fr_affichee_3m"]
+
+    def auc(donnees, colonnes, evaluation="test"):
+        entrainement, test = donnees[donnees["jeu"] == "entrainement"], donnees[donnees["jeu"] == evaluation]
+        modele = make_pipeline(StandardScaler(), LogisticRegression(max_iter=1000)).fit(entrainement[colonnes], entrainement["cible"])
+        p = modele.predict_proba(test[colonnes])[:, 1]
+        return {"auc": float(roc_auc_score(test["cible"], p)), "pr_auc": float(average_precision_score(test["cible"], p)),
+                "coef": dict(zip(colonnes, modele[-1].coef_[0]))}
+
+    # Norvège : couverte jusqu'en 06/2024, donc évaluée sur la validation couverte (01 à 06/2024), pas sur le test.
+    norvege = t[(t["jeu"] == "entrainement") | ((t["jeu"] == "validation") & (t["no_couvert"] == 1))]
+    return {"Q1 sans": auc(t, base), "Q1 avec": auc(t, base + ["fr_autres_classe_3m"]),
+            "Q2 Italie sans": auc(t, base), "Q2 Italie avec": auc(t, base + ["it_affichee_3m", "it_couvert"]),
+            "Q2 Suède avec": auc(t, base + ["se_nouvelle_3m"]), "Q2 Tchéquie avec": auc(t, base + ["cz_nouvelle_3m"]),
+            "Q2 Slovaquie avec": auc(t, base + ["sk_nouvelle_3m"]),
+            "Q2 tous pays avec": auc(t, base + ["it_affichee_3m", "it_couvert", "se_nouvelle_3m", "cz_nouvelle_3m", "sk_nouvelle_3m"]),
+            "Q2 Norvège sans (validation 01-06/2024)": auc(norvege, base, "validation"),
+            "Q2 Norvège avec (validation 01-06/2024)": auc(norvege, base + ["no_nouvelle_3m", "no_couvert"], "validation")}
+
+
+def nouvelles_penuries(k=12):
+    """La question difficile : sur les seules substances calmes (aucun signalement depuis k mois), quels signaux
+    annoncent une rupture ? Taux de base, puis apport de chaque signal (régression logistique, entraînement →
+    test 2025 ; PR-AUC à comparer au taux de base, AUC à 0,5)."""
+    import numpy as np
+    from sklearn.linear_model import LogisticRegression
+    from sklearn.metrics import average_precision_score, roc_auc_score
+    from sklearn.pipeline import make_pipeline
+    from sklearn.preprocessing import StandardScaler
+
+    t = pd.read_parquet(PANEL)
+    t = t[(t[f"calme_{k}m"] == 1) & (t["jeu"].isin(["entrainement", "test"]))].copy()
+    cible = f"cible_nouvelle_{k}m"
+    for entree, sortie in [("conso_6m_pub", "conso"), ("sig_annee_pub", "sig"), ("sig_cumul_pub", "sig_cumul")]:
+        t[sortie] = np.log1p(t[entree].astype("float64"))
+    t["tendance"], t["saison"] = np.log(t["conso_tendance_6m"].astype("float64")), np.log(t["conso_saison_cible"].astype("float64"))
+    europe = ["it_affichee_3m", "it_couvert", "se_nouvelle_3m", "cz_nouvelle_3m", "sk_nouvelle_3m"]
+    for c in europe + ["fr_affichee_3m", "fr_autres_classe_3m"]:
+        t[c] = t[c].astype("float64")
+    base = ["conso", "tendance", "saison", "ue_critique", "sig", "sig_cumul", "fr_affichee_3m"]
+    entrainement, test = t[t["jeu"] == "entrainement"], t[t["jeu"] == "test"]
+
+    def evaluer(colonnes):
+        modele = make_pipeline(StandardScaler(), LogisticRegression(max_iter=2000)).fit(entrainement[colonnes], entrainement[cible])
+        prob = modele.predict_proba(test[colonnes])[:, 1]
+        return float(roc_auc_score(test[cible], prob)), float(average_precision_score(test[cible], prob))
+
+    resultat = {"lignes_test": len(test), "positives_test": int(test[cible].sum()), "taux_test": float(test[cible].mean()),
+                "modeles": {"base": evaluer(base), "base + Q1 (classe)": evaluer(base + ["fr_autres_classe_3m"]),
+                            "base + Italie": evaluer(base + ["it_affichee_3m", "it_couvert"]),
+                            "base + Suède": evaluer(base + ["se_nouvelle_3m"]),
+                            "base + Tchéquie": evaluer(base + ["cz_nouvelle_3m"]),
+                            "base + Slovaquie": evaluer(base + ["sk_nouvelle_3m"]),
+                            "base + tous les pays": evaluer(base + europe),
+                            "base + tous les pays + Q1": evaluer(base + europe + ["fr_autres_classe_3m"])},
+                "seuls": {}}
+    for c in ["sig_cumul", "conso", "fr_affichee_3m", "fr_autres_classe_3m"] + europe[:1] + europe[2:]:
+        if test[c].nunique() > 1:
+            resultat["seuls"][c] = float(roc_auc_score(test[cible], test[c]))
+    return resultat
+
+
+def pct(x):
+    return f"{100 * x:.1f} %"
+
+
+def main():
+    r = calculer()
+    print(f"panel_fr : {r['substances']} substances × {r['mois']} mois = {r['lignes']:,} lignes, "
+          f"{r['positives']:,} positives ({pct(r['taux'])})".replace(",", " "))
+    for jeu, d in r["jeux"].items():
+        print(f"  {jeu:13} {d['lignes']:>7,} lignes, {d['positives']:>6,} positives ({pct(d['taux'])})".replace(",", " "))
+    for nom, d in r["expositions"].items():
+        print(f"{nom} : {d['mois_couverts']} mois, {d['lignes']:,} lignes ; exposées {pct(d['part_exposee'])} ; "
+              f"positives {pct(d['positives_si_exposee'])} si oui, {pct(d['positives_sinon'])} sinon".replace(",", " "))
+    print("\nSignaux contrôlés (régression logistique, test 2025 sauf mention) :")
+    for nom, d in facteurs().items():
+        print(f"  {nom:40} AUC {d['auc']:.3f}  PR-AUC {d['pr_auc']:.3f}")
+    n = nouvelles_penuries(12)
+    print(f"\nNouvelles pénuries (substances sans signalement depuis 12 mois), test 2025 : {n['lignes_test']} lignes, "
+          f"{n['positives_test']} positives, taux de base {pct(n['taux_test'])} (= PR-AUC du hasard)")
+    for nom, (a, pr) in n["modeles"].items():
+        print(f"  {nom:28} AUC {a:.3f}  PR-AUC {pr:.3f}")
+    print("  variables seules (AUC) : " + ", ".join(f"{c} {v:.3f}" for c, v in n["seuls"].items()))
+
+
+if __name__ == "__main__":
+    main()

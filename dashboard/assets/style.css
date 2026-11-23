@@ -1,0 +1,74 @@
+:root {
+  --page: #f9f9f7;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --hairline: #e1e0d9;
+  --border: rgba(11, 11, 11, 0.10);
+  --accent: #2a78d6;
+  --warn-bg: #fff6e5;
+  --warn-ink: #7a4b00;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--page);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.page { max-width: 1320px; margin: 0 auto; padding: 20px 16px 48px; }
+
+header h1 { font-size: 22px; margin: 0 0 4px; font-weight: 650; }
+header p { margin: 0; color: var(--ink-2); max-width: 900px; }
+
+.tuiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 16px 0 14px; }
+.tuile { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.tuile .valeur { font-size: 22px; font-weight: 650; }
+.tuile .libelle { color: var(--ink-2); font-size: 12.5px; }
+
+.onglets { border-bottom: 1px solid var(--hairline) !important; }
+.onglet { padding: 9px 14px !important; border: none !important; background: transparent !important;
+  color: var(--ink-2) !important; font-weight: 500; border-bottom: 2px solid transparent !important; }
+.onglet--actif { color: var(--ink) !important; border-bottom: 2px solid var(--accent) !important; font-weight: 650; }
+
+.vue { padding-top: 14px; }
+.intro { color: var(--ink-2); margin: 0 0 12px; max-width: 980px; }
+.intro b { color: var(--ink); }
+
+.filtres { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-end; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; }
+.filtre label.titre { display: block; font-size: 12px; color: var(--muted); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .03em; margin-bottom: 4px; }
+.filtre .dash-radioitems label, .filtre .dash-checklist label { margin-right: 12px; }
+.filtre-large { flex: 1 1 320px; min-width: 260px; }
+
+.carte { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; min-width: 0; }
+.carte h3 { font-size: 15px; margin: 0 0 2px; font-weight: 650; }
+.carte .sous-titre { color: var(--ink-2); font-size: 12.5px; margin: 0 0 6px; }
+.lecture { font-size: 12.5px; color: var(--ink-2); margin-top: 4px; }
+.lecture summary { cursor: pointer; color: var(--accent); }
+
+.grille-2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.grille-3-2 { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 12px; }
+@media (max-width: 900px) { .grille-2, .grille-3-2 { grid-template-columns: minmax(0, 1fr); } }
+
+.avertissement { background: var(--warn-bg); color: var(--warn-ink); border-radius: 6px; padding: 7px 10px;
+  font-size: 12.5px; margin: 6px 0; }
+.badge { display: inline-block; border-radius: 999px; padding: 2px 9px; font-size: 12px; margin-right: 6px;
+  border: 1px solid var(--border); background: var(--page); }
+.badge.fort { background: #fde8e8; border-color: #f3b4b4; color: #8a1c1c; }
+
+.profil dl { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 6px 0 10px; }
+.profil dt { color: var(--ink-2); }
+.profil dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner td,
+.dash-table-container .dash-spreadsheet-container .dash-spreadsheet-inner th { font-family: system-ui, -apple-system, "Segoe UI", sans-serif !important; font-size: 13px; }
+
+footer { color: var(--muted); font-size: 12px; margin-top: 24px; }
