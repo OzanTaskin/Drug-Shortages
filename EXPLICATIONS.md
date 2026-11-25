@@ -350,8 +350,25 @@ Un épisode est « affiché » de sa `publication` jusqu'à `fin_connue_le`, jam
 vides signalent un mois non couvert par la source, pas un zéro. Contrôles : grain, nombre de lignes, taux de positifs,
 écart de trois mois entre jeux, et recalcul des variables avec les seules données publiées à 06/2024. Premier résultat contrôlé (`analyse/faisabilite.py`, régression logistique, test 2025) : AUC 0,862 sans Q1, 0,863 avec ;
 0,863 sans l'Italie, 0,866 avec : l'historique de la substance et son nombre de présentations dominent, Q1 n'apporte rien,
-l'Italie peu. L'Allemagne (13 mois) n'existe qu'en validation et test : non apprenable. Restent : la
-référence à battre, les modèles avec et sans Q1/Q2, la table de prédiction et le rangement des modèles.
+l'Italie peu. L'Allemagne (13 mois) n'existe qu'en validation et test : non apprenable.
+
+**Étape 6 faite** (`analyse/modeles.py`, lignes à partir de 06/2021, choix sur la validation, test 2025 lu une fois) :
+
+| Test 2025 | PR-AUC | ROC-AUC | rappel top 100 / mois | précision top 100 |
+|---|---|---|---|---|
+| Taux de positifs (hasard) | 0,28 | 0,50 | — | 0,28 |
+| Référence « affichée sur la page ANSM sur 3 mois » | 0,554 | 0,794 | 0,160 | 0,547 |
+| Référence « signalée l'année précédente » | 0,738 | 0,855 | 0,267 | 0,913 |
+| Régression logistique, variables de base (retenue) | **0,753** | **0,862** | 0,272 | 0,931 |
+
+Le gradient boosting (HistGradientBoosting) ne fait pas mieux (0,73 à 0,75 en validation selon la capacité et la
+fenêtre d'entraînement) : le plafond vient des variables, pas du modèle. La référence simple fait presque aussi bien
+que le modèle : l'historique de signalements de la substance porte l'essentiel du signal. Q1 et Q2 (même modèle avec et
+sans la variable, écart de PR-AUC sur le test, IC 95 % par bootstrap apparié sur les substances) : Q1 +0,0002
+[−0,0003 ; +0,0006] ; Italie +0,0030 [−0,0000 ; +0,0062] en logistique, −0,0007 [−0,0064 ; +0,0053] en boosting.
+Aucun apport significatif ; l'Italie est à la limite et seulement en logistique. Le modèle retenu est dans `models/`,
+les métriques et les prédictions de validation et de test dans `outputs/`. Restent : la table de prédiction (étape 7)
+et la version datée de `panel_fr` (étape 8).
 
 Le plan suit l'ordre imposé par le cours 1 (diapos 53 à 63).
 

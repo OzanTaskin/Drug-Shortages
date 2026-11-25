@@ -1,5 +1,7 @@
 # Données : trop lourdes pour GitHub (483 Mo), régénérées par `python -m collecte`
 data/
+models/
+outputs/
 
 # Environnement Python
 .venv/
