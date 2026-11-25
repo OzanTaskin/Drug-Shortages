@@ -6,3 +6,6 @@ lxml>=5
 openpyxl>=3.1
 matplotlib>=3.8
 scikit-learn>=1.5
+dash>=3.0
+plotly>=6.0
+scipy>=1.11

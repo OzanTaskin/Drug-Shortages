@@ -9,6 +9,7 @@ les méthodes vues en cours.
 | **README.md** (ce fichier) | le projet en bref, comment lancer le code |
 | [Rapport-DALAS-Deliverable1/build/Rapport-DALAS-Deliverable1.pdf](Rapport-DALAS-Deliverable1/build/Rapport-DALAS-Deliverable1.pdf) | **le rapport du livrable 1** (2 pages) : questions, collecte, description quantitative, prétraitement |
 | [EXPLICATIONS.md](EXPLICATIONS.md) | **l'explication détaillée** : chaque source, chaque table, chaque choix, et pourquoi, au regard des cours ; la suite du projet |
+| [dashboard/README.md](dashboard/README.md) | **le dashboard** : lancement, les sept vues |
 | [CHANGELOG_DATA.md](CHANGELOG_DATA.md) | une ligne par changement des données : date, auteur, quoi, pourquoi |
 | `manifestes/` | l'état exact des tables à chaque construction de référence (lignes, sommes, empreintes) |
 
@@ -33,7 +34,7 @@ qui ne sont jamais en pénurie. L'Italie et l'Allemagne servent de signaux. Dét
 | Niveau 3 : table d'entraînement `panel_fr` | ✅ 99 063 lignes (1 223 substances × 81 mois), cible, 11 variables, découpage temporel ; 9 contrôles ; voir [EXPLICATIONS.md](EXPLICATIONS.md), section 6 |
 | Étape 6 : référence et modèles, test de Q1/Q2 | ✅ `analyse/modeles.py` : la régression logistique (PR-AUC test 0,753) bat de peu la référence « signalée l'année précédente » (0,738) ; Q1 et Q2 n'apportent rien de significatif |
 | Étapes 7 et 8 : table de prédiction, version figée du panel | ✅ `analyse/prediction.py` : risque de chaque substance pour 11/2026 → 01/2027 ; `data/final/panel_fr_v1_<jour>.parquet` |
-| TME6 : dashboard | ⏳ |
+| TME6 : dashboard | ✅ `dashboard/` : application Dash, 7 vues, lancée par `python dashboard/app.py` sans les données brutes ; voir [dashboard/README.md](dashboard/README.md) |
 | TME9 : rapport final | ⏳ |
 
 ## Lancer le code
@@ -54,6 +55,8 @@ python3 -m venv .venv
 .venv/bin/python -m analyse.prediction     # étape 7 : risque prédit pour le mois courant → outputs/prediction_*.parquet
 ```
 
+- **Dashboard** : `.venv/bin/python dashboard/app.py`, puis http://127.0.0.1:8050. Il n'a besoin que de
+  `dashboard/donnees/` (versionné) ; `dashboard/construire_donnees.py` le régénère.
 - Étapes isolées : `python -m collecte actuelles wayback`, `python -m nettoyage controles`.
 - La collecte peut être relancée : les fichiers déjà présents ne sont pas retéléchargés. Si un
   téléchargement échoue, elle s'arrête avec la liste des fichiers manquants.
@@ -101,6 +104,7 @@ analyse/description.py    description du dataset : dimensions, couverture, duré
 analyse/faisabilite.py    faisabilité : taux de cas positifs, repère naïf, exposition pour Q1 et Q2
 analyse/modeles.py        étape 6 : références à battre, modèles, Q1/Q2 avec et sans, intervalles par bootstrap
 analyse/prediction.py     étape 7 : variables d'une seule date (mois courant), sans la cible, et score du modèle retenu
+dashboard/                application Dash (app.py), tables résumées versionnées (donnees/), construction (construire_donnees.py)
 Rapport-DALAS-Deliverable1/ rapport du livrable 1 (LaTeX et PDF)
 ```
 
