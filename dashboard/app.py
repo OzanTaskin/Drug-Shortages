@@ -321,7 +321,9 @@ def vue_panel() -> html.Div:
 app = Dash(__name__, title="Pénuries de médicaments — DALAS", suppress_callback_exceptions=True)
 ONGLETS = [("temps", "Dans le temps", vue_temps), ("classes", "Classes thérapeutiques", vue_classes),
            ("durees", "Durées et causes", vue_durees), ("pays", "Pays comparés", vue_pays),
-           ("substance", "Fiche substance", vue_substance), ("panel", "Panel et qualité", vue_panel)]
+           ("substance", "Fiche substance", vue_substance)]
+# Onglet masqué pour l'instant (code et callbacks gardés) : remettre cette ligne dans ONGLETS pour le réafficher.
+ONGLETS_MASQUES = [("panel", "Panel et qualité", vue_panel)]
 app.layout = html.Div([
     html.Header([html.H1("Pénuries de médicaments en France : prévisibles, contagieuses, importées ?"),
                  html.P("Explorer le dataset du projet DALAS : les pénuries publiées par l'ANSM, l'AIFA et le BfArM, les "
