@@ -34,7 +34,7 @@ qui ne sont jamais en pénurie. L'Italie et l'Allemagne servent de signaux. Dét
 | Niveau 3 : table d'entraînement `panel_fr` | ✅ 99 063 lignes (1 223 substances × 81 mois), cible, 11 variables, découpage temporel ; 9 contrôles ; voir [EXPLICATIONS.md](EXPLICATIONS.md), section 6 |
 | Étape 6 : référence et modèles, test de Q1/Q2 | ✅ `analyse/modeles.py` : la régression logistique (PR-AUC test 0,753) bat de peu la référence « signalée l'année précédente » (0,738) ; Q1 et Q2 n'apportent rien de significatif |
 | Étapes 7 et 8 : table de prédiction, version figée du panel | ✅ `analyse/prediction.py` : risque de chaque substance pour 11/2026 → 01/2027 ; `data/final/panel_fr_v1_<jour>.parquet` |
-| TME6 : dashboard | ✅ `dashboard/` : application Dash, 7 vues, lancée par `python dashboard/app.py` sans les données brutes ; voir [dashboard/README.md](dashboard/README.md) |
+| TME6 : dashboard | ✅ `dashboard/` : application Dash, 6 vues sur les données (aucun modèle), lancée par `python dashboard/app.py` sans les données brutes ; voir [dashboard/README.md](dashboard/README.md) |
 | TME9 : rapport final | ⏳ |
 
 ## Lancer le code

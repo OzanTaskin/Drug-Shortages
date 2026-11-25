@@ -32,10 +32,7 @@ COOC = pd.read_parquet(DONNEES / "cooccurrence.parquet")
 PHOTOS = pd.read_parquet(DONNEES / "photos.parquet")
 PANEL = pd.read_parquet(DONNEES / "panel_mensuel.parquet")
 SIGNAUX = pd.read_parquet(DONNEES / "panel_signaux.parquet")
-EVAL = pd.read_parquet(DONNEES / "predictions_evaluation.parquet")
-PREVISION = pd.read_parquet(DONNEES / "prediction_courante.parquet")
 META = json.loads((DONNEES / "meta.json").read_text())
-METRIQUES = META["metriques"]
 
 # ── Référentiels ────────────────────────────────────────────────────────────────────────────
 PAYS = ["FR", "IT", "DE"]
@@ -44,7 +41,6 @@ SOURCES = {"FR": "ANSM, page des disponibilités", "IT": "AIFA, liste des médic
            "DE": "BfArM, Lieferengpässe"}
 # Palette catégorielle validée (validate_palette.js, ordre fixe) : couleur = pays, jamais son rang.
 COULEUR = {"FR": "#2a78d6", "IT": "#eb6834", "DE": "#1baf7a"}
-GRIS_REF = "#898781"
 ATC1 = {"A": "Digestif et métabolisme", "B": "Sang", "C": "Cardio-vasculaire", "D": "Dermatologie",
         "G": "Génito-urinaire", "H": "Hormones", "J": "Anti-infectieux", "L": "Cancérologie, immunité",
         "M": "Muscles et squelette", "N": "Système nerveux", "P": "Antiparasitaires", "R": "Respiratoire",
@@ -64,10 +60,6 @@ FIN_VUE = pd.Timestamp(META["dernier_mois"] + "-01") + pd.offsets.MonthEnd(0)
 
 def fmt(n: float) -> str:
     return f"{n:,.0f}".replace(",", " ")
-
-
-def virgule(x: float, d: int = 3) -> str:
-    return f"{x:.{d}f}".replace(".", ",")
 
 
 def mise_en_page(fig: go.Figure, hauteur: int = 380, **kw) -> go.Figure:
@@ -137,7 +129,7 @@ def spearman_substances() -> tuple[pd.DataFrame, int]:
         f"Consommation {ANNEE_CONSO} (log)": np.log10(MITM["boites"].fillna(0) + 1),
         "Présentations": MITM["nb_presentations"].fillna(0), "Signalements ANSM": MITM["nb_signalements"],
         "Durée médiane": MITM["duree_mediane_j"], "Liste critique UE": MITM["ue_critique"].astype(int),
-        **{f"Épisodes {p}": MITM[f"ep_{p}"] for p in PAYS}, "Risque prédit": MITM["score"]})
+        **{f"Épisodes {p}": MITM[f"ep_{p}"] for p in PAYS}})
     r = v.corr(method="spearman")
     ordre = r.index[leaves_list(linkage(squareform((1 - r.abs()).clip(lower=0).to_numpy(), checks=False), "average"))]
     return r.loc[ordre, ordre], len(v)
@@ -145,13 +137,11 @@ def spearman_substances() -> tuple[pd.DataFrame, int]:
 
 QUALITE = tableau_qualite()
 SPEARMAN, N_SPEARMAN = spearman_substances()
-RETENU = METRIQUES["retenu"]["nom"]
 
 # ── Mise en page ────────────────────────────────────────────────────────────────────────────
 TUILES = [(META["episodes"], "épisodes de pénurie ou d'arrêt (FR, IT, DE)"), (len(SIG), "signalements ANSM (2019–2025)"),
           (META["panel_substances"], "substances suivies (MITM)"), (META["panel_lignes"], "lignes du panel substance × mois"),
-          (virgule(METRIQUES["test"][RETENU]["pr_auc"]), "PR-AUC du modèle sur le test 2025"),
-          (f"{(PREVISION['score'] >= 0.5).sum()}", f"substances à risque > 50 % ({META['mois_prediction']})")]
+          (SIG["laboratoire"].nunique(), "laboratoires déclarants"), ("2019–2026", "période couverte")]
 
 
 def vue_temps() -> html.Div:
@@ -202,7 +192,7 @@ def vue_classes() -> html.Div:
                 {"label": f"consommation {ANNEE_CONSO} (boîtes)", "value": "conso"}])),
             filtre("Couleur", dcc.RadioItems(id="arbre-couleur", value="sig", inline=True, options=[
                 {"label": "signalements par substance", "value": "sig"},
-                {"label": "risque prédit", "value": "score"}])),
+                {"label": "pays touchés (sur 3)", "value": "pays"}])),
         ], className="filtres"),
         html.Div([
             carte("L'arbre thérapeutique", "Classe ATC1 → ATC2 → substance", graphe("arbre"),
@@ -259,8 +249,7 @@ def vue_pays() -> html.Div:
                   "dans le pays en colonne (même mois)", graphe("cooc"),
                   "Calculé sur les seuls mois observés dans les deux pays. Lecture : « quand la France manque d'une substance, "
                   "l'Italie en manque aussi dans x % des cas ». La matrice n'est pas symétrique : l'Italie recense beaucoup "
-                  "plus de pénuries, donc elle « couvre » souvent les autres. Simultané ne veut pas dire « annonce » : "
-                  "l'onglet Modèle mesure ce que l'Italie apporte vraiment à la prévision."),
+                  "plus de pénuries, donc elle « couvre » souvent les autres. Simultané ne veut pas dire « annonce »."),
             carte("Ce qui va ensemble, substance par substance",
                   f"Corrélation de Spearman entre {len(SPEARMAN)} variables, sur les {N_SPEARMAN} substances suivies",
                   graphe("spearman"),
@@ -274,7 +263,7 @@ def vue_pays() -> html.Div:
 def vue_substance() -> html.Div:
     return html.Div([
         html.P("Toutes les sources réunies pour une substance : ses pénuries dans chaque pays, ses signalements à l'ANSM, "
-               "sa consommation en France, son risque prédit et ses voisines de même classe.", className="intro"),
+               "sa consommation en France et ses voisines de même classe.", className="intro"),
         html.Div([filtre("Substance (nom ou code ATC)", dcc.Dropdown(id="substance", options=OPTIONS_SUBSTANCES,
                                                                         value="J01CA04", clearable=False), large=True)],
                  className="filtres"),
@@ -285,16 +274,10 @@ def vue_substance() -> html.Div:
               "plusieurs barres superposées = plusieurs produits en pénurie en même temps. Barres pâles : arrêts définitifs."),
         html.Div([
             carte("Signalements ANSM", "Déclarations des laboratoires, par trimestre", graphe("sub-signalements")),
-            carte("Risque prédit et réalité", "Score du modèle chaque mois (validation et test) ; points = signalement dans les 3 mois",
-                  graphe("sub-score"),
-                  "Le score est la probabilité, estimée à la fin du mois, d'au moins un signalement dans les 3 mois suivants. "
-                  "Un point en haut = la substance a bien été signalée ensuite."),
-        ], className="grille-2"),
-        html.Div([
             carte("Consommation en France", "Boîtes remboursées par l'Assurance Maladie, par an", graphe("sub-conso")),
-            carte("Substances voisines (même classe ATC4)", "Les substituts possibles, au cœur de la question Q1",
-                  html.Div(id="voisines")),
         ], className="grille-2"),
+        carte("Substances voisines (même classe ATC4)", "Les substituts possibles, au cœur de la question Q1",
+              html.Div(id="voisines")),
     ], className="vue")
 
 
@@ -335,51 +318,14 @@ def vue_panel() -> html.Div:
     ], className="vue")
 
 
-def vue_modele() -> html.Div:
-    return html.Div([
-        html.P(["Peut-on anticiper les pénuries ? Le modèle retenu (", html.B("régression logistique"), ", choisi sur la "
-                "validation) est comparé à des règles simples sur le test 2025, lu une seule fois. Puis Q1 et Q2 : le même "
-                "modèle avec et sans la variable testée."], className="intro"),
-        html.Div([
-            carte("Le modèle face aux références", "Test 2025 : PR-AUC (précision moyenne) ; ligne pointillée = hasard",
-                  graphe("modele-metriques"),
-                  "La PR-AUC résume la précision à tous les seuils ; un classement au hasard vaut le taux de positifs (0,28). "
-                  "La règle « signalée l'année précédente » fait presque aussi bien que le modèle : l'historique de la "
-                  "substance porte l'essentiel du signal."),
-            carte("Q1 et Q2 : ce que la variable ajoute", "Écart de PR-AUC sur le test (avec − sans), intervalle à 95 % par bootstrap sur les substances",
-                  graphe("modele-questions"),
-                  "Un intervalle qui touche zéro = pas d'apport démontré. La cascade (Q1) n'apporte rien ; l'Italie (Q2) est à "
-                  "la limite en logistique et nulle en boosting. L'Allemagne n'est pas testable (13 mois, absents de l'entraînement)."),
-        ], className="grille-2"),
-        carte("Mois par mois sur le test : les 100 substances jugées les plus à risque", "Part réellement signalée dans les 3 mois",
-              graphe("modele-topk"),
-              "Chaque mois, on prend les 100 substances au score le plus élevé et on regarde combien ont été signalées. "
-              "C'est l'usage visé : une liste courte à surveiller."),
-        html.Div([
-            filtre("Classe ATC", dcc.Dropdown(id="prev-classe", value="tout", clearable=False, options=[
-                {"label": "toutes", "value": "tout"}, *[{"label": f"{k} · {v}", "value": k} for k, v in ATC1.items()]])),
-            filtre("Pénurie affichée en France", dcc.RadioItems(id="prev-affichee", value="tout", inline=True, options=[
-                {"label": "toutes", "value": "tout"}, {"label": "pas encore affichées", "value": "non"}])),
-        ], className="filtres"),
-        carte(f"Prévision : risque pour {pd.Period(META['mois_prediction'], 'M') + 1} → {pd.Period(META['mois_prediction'], 'M') + 3}",
-              f"Données connues à la fin de {META['mois_prediction']} ; les substances au risque le plus élevé en premier",
-              html.Div(id="prev-tableau"),
-              "Le score est calculé par analyse/prediction.py avec les mêmes variables que le panel (signalements jusqu'en "
-              "2025, consommation 2025). « Pas encore affichées » garde les substances absentes de la page ANSM ces 3 "
-              "derniers mois : celles qu'une alerte apprendrait vraiment."),
-    ], className="vue")
-
-
 app = Dash(__name__, title="Pénuries de médicaments — DALAS", suppress_callback_exceptions=True)
 ONGLETS = [("temps", "Dans le temps", vue_temps), ("classes", "Classes thérapeutiques", vue_classes),
            ("durees", "Durées et causes", vue_durees), ("pays", "Pays comparés", vue_pays),
-           ("substance", "Fiche substance", vue_substance), ("panel", "Panel et qualité", vue_panel),
-           ("modele", "Modèle et prévisions", vue_modele)]
+           ("substance", "Fiche substance", vue_substance), ("panel", "Panel et qualité", vue_panel)]
 app.layout = html.Div([
     html.Header([html.H1("Pénuries de médicaments en France : prévisibles, contagieuses, importées ?"),
                  html.P("Explorer le dataset du projet DALAS : les pénuries publiées par l'ANSM, l'AIFA et le BfArM, les "
-                        "signalements de rupture à l'ANSM, la consommation de l'Assurance Maladie, le panel de modélisation "
-                        "et ce que le modèle en tire.")]),
+                        "signalements de rupture à l'ANSM, la consommation de l'Assurance Maladie et le panel de modélisation.")]),
     html.Div([html.Div([html.Div(v if isinstance(v, str) else fmt(v), className="valeur"), html.Div(l, className="libelle")],
                        className="tuile") for v, l in TUILES], className="tuiles"),
     dcc.Tabs(id="onglets", value="temps", className="onglets", children=[
@@ -484,7 +430,7 @@ def fig_arbre(taille: str, couleur: str) -> go.Figure:
     m = MITM.assign(l1=MITM["atc1"] + " · " + MITM["atc1"].map(ATC1),
                     l2=MITM["atc2"] + " · " + MITM["libelle_atc2"].fillna("").str.slice(0, 32),
                     poids=1.0 if taille == "nb" else MITM["boites"].fillna(0).clip(lower=1),
-                    mesure=MITM["nb_signalements"] if couleur == "sig" else MITM["score"].fillna(0) * 100)
+                    mesure=MITM["nb_signalements"] if couleur == "sig" else MITM["nb_pays_touches"])
     m["pm"] = m["poids"] * m["mesure"]
     m["id1"], m["id2"] = m["l1"], m["l1"] + "/" + m["l2"]
     m["id3"] = m["id2"] + "/" + m["atc5"]
@@ -499,7 +445,7 @@ def fig_arbre(taille: str, couleur: str) -> go.Figure:
         unite, couleurs = "signalements par substance (log)", np.log10(mesures + 1)
         barre = dict(tickvals=np.log10(np.array([0, 3, 10, 30, 100, 300]) + 1), ticktext=["0", "3", "10", "30", "100", "300"])
     else:
-        unite, couleurs, barre = "risque prédit moyen (%)", mesures, {}
+        unite, couleurs, barre = "pays touchés (sur 3)", mesures, {}
     fig = go.Figure(go.Sunburst(ids=n["id"], labels=n["label"], parents=n["parent"], values=n["poids"], branchvalues="total",
                                 customdata=mesures, maxdepth=2, insidetextorientation="radial",
                                 marker=dict(colors=couleurs, colorscale=BLEUS, line=dict(color="white", width=1),
@@ -549,7 +495,6 @@ def liste_substances(click):
     m = MITM[MITM["atc2"] == atc2].sort_values("nb_signalements", ascending=False)
     df = pd.DataFrame({"Substance": m["nom"], "ATC": m["atc5"], "Signalements ANSM": m["nb_signalements"],
                        **{f"Épisodes {p}": m[f"ep_{p}"] for p in PAYS},
-                       "Risque prédit": (m["score"] * 100).round(0).astype("Int64").astype(str) + " %",
                        "Liste critique UE": np.where(m["ue_critique"], "oui", "")})
     return [html.P(f"{atc2} · {LIB_ATC2.get(atc2, '')} — {len(df)} substances", className="sous-titre"),
             tableau(df, sort_action="native", page_size=12)]
@@ -638,7 +583,7 @@ def fig_spearman(_) -> go.Figure:
 
 # ── Vue 5 : fiche substance ─────────────────────────────────────────────────────────────────
 @app.callback(Output("substance-badges", "children"), Output("gantt", "figure"), Output("sub-signalements", "figure"),
-              Output("sub-score", "figure"), Output("sub-conso", "figure"), Output("voisines", "children"),
+              Output("sub-conso", "figure"), Output("voisines", "children"),
               Input("substance", "value"))
 def fiche(atc5: str):
     s = SUB.set_index("atc5").loc[atc5]
@@ -649,9 +594,7 @@ def fiche(atc5: str):
         badges.append(html.Span("Liste critique de l'UE", className="badge fort"))
     if s["mitm"]:
         badges.append(html.Span("Suivie dans le panel (MITM)", className="badge"))
-    if pd.notna(s["score"]):
-        badges.append(html.Span(f"Risque prédit ({META['mois_prediction']}) : {s['score']:.0%} · rang {s['rang']} / "
-                                f"{len(PREVISION)}", className="badge fort" if s["score"] >= 0.5 else "badge"))
+    badges.append(html.Span(f"Pays touchés : {s['nb_pays_touches']} / 3", className="badge"))
 
     e = EP[EP["atc5"] == atc5].copy()
     e["fin_aff"] = e["fin"].fillna(FIN_VUE).clip(upper=FIN_VUE)
@@ -686,28 +629,6 @@ def fiche(atc5: str):
                                customdata=trim.index.quarter, hovertemplate="%{x|%Y} T%{customdata} : %{y} signalements<extra></extra>"))
     mise_en_page(fig_sig, 280, yaxis_title="signalements", bargap=0.1)
 
-    ev = EVAL[EVAL["atc5"] == atc5].sort_values("mois")
-    fig_score = go.Figure()
-    if ev.empty:
-        vide(fig_score, "Substance hors du panel (pas de médicament MITM commercialisé)")
-    else:
-        for jeu in ("validation", "test"):
-            g = ev[ev["jeu"] == jeu]
-            fig_score.add_trace(go.Scatter(x=g["mois"], y=g["score"] * 100, mode="lines", name=f"score ({jeu})",
-                                           line=dict(color=COULEUR["FR"], width=2), showlegend=False,
-                                           hovertemplate="%{x|%m/%Y} : risque %{y:.0f} %<extra></extra>"))
-        fig_score.add_trace(go.Scatter(x=ev["mois"], y=ev["cible"] * 100, mode="markers", name="signalée dans les 3 mois",
-                                       marker=dict(size=8, color=ENCRE2, line=dict(color=SURFACE, width=2)),
-                                       hovertemplate="%{x|%m/%Y} : " + "%{customdata}<extra></extra>",
-                                       customdata=np.where(ev["cible"] == 1, "signalée ensuite", "pas de signalement")))
-        if pd.notna(s["score"]):
-            mois = pd.Timestamp(META["mois_prediction"] + "-01")
-            fig_score.add_trace(go.Scatter(x=[mois], y=[s["score"] * 100], mode="markers+text", name="prévision",
-                                           marker=dict(size=10, color=COULEUR["FR"], symbol="diamond"),
-                                           text=["prévision"], textposition="middle left", textfont_color=ENCRE2,
-                                           hovertemplate="%{x|%m/%Y} : prévision %{y:.0f} %<extra></extra>"))
-    mise_en_page(fig_score, 280, yaxis=dict(title="%", range=[-5, 105]), showlegend=False)
-
     c = CONSO[CONSO["atc5"] == atc5].sort_values("annee")
     fig_conso = go.Figure(go.Bar(x=c["annee"], y=c["boites"], marker_color=COULEUR["FR"], marker_line=dict(color=SURFACE, width=2),
                                  hovertemplate="%{x} : %{y:,.0f} boîtes<extra></extra>"))
@@ -717,11 +638,10 @@ def fiche(atc5: str):
 
     v = SUB[SUB["atc4"] == s["atc4"]].sort_values("nb_signalements", ascending=False)
     df = pd.DataFrame({"Substance": v["nom"], "ATC": v["atc5"], "Signalements ANSM": v["nb_signalements"],
-                       **{f"Épisodes {p}": v[f"ep_{p}"] for p in PAYS},
-                       "Risque prédit": v["score"].map(lambda x: "" if pd.isna(x) else f"{x:.0%}")})
+                       **{f"Épisodes {p}": v[f"ep_{p}"] for p in PAYS}})
     voisines = tableau(df, sort_action="native", page_size=8, style_data_conditional=[
         {"if": {"filter_query": f'{{ATC}} = "{atc5}"'}, "fontWeight": 700, "backgroundColor": "#eef4fc"}])
-    return badges, gantt, fig_sig, fig_score, fig_conso, voisines
+    return badges, gantt, fig_sig, fig_conso, voisines
 
 
 # ── Vue 6 : panel et qualité ────────────────────────────────────────────────────────────────
@@ -761,83 +681,6 @@ def fig_signaux(echelle: str) -> go.Figure:
                                hovertemplate="%{y}<br>%{x|%m/%Y} : %{customdata:.1f} % des substances<extra></extra>"))
     fig.update_yaxes(autorange="reversed")
     return mise_en_page(fig, 300, plot_bgcolor="#d9d8d2")
-
-
-# ── Vue 7 : modèle et prévisions ────────────────────────────────────────────────────────────
-@app.callback(Output("modele-metriques", "figure"), Input("onglets", "value"))
-def fig_metriques(_) -> go.Figure:
-    t = METRIQUES["test"]
-    noms = {"ref_affichee_3m": "Règle : affichée sur la page ANSM (3 mois)",
-            "ref_signalee_annee_prec": "Règle : signalée l'année précédente", RETENU: "Régression logistique (retenue)"}
-    cles = list(noms)
-    fig = go.Figure(go.Bar(x=[t[k]["pr_auc"] for k in cles], y=[noms[k] for k in cles], orientation="h", width=0.55,
-                           marker_color=[GRIS_REF, GRIS_REF, COULEUR["FR"]], marker_line=dict(color=SURFACE, width=2),
-                           text=[virgule(t[k]["pr_auc"]) for k in cles], textposition="outside", textfont_color=ENCRE2,
-                           customdata=[[virgule(t[k]["roc_auc"]), f"{t[k]['precision_top100']:.0%}"] for k in cles],
-                           hovertemplate="%{y}<br>PR-AUC %{x:.3f} · ROC-AUC %{customdata[0]}<br>"
-                                         "précision top 100 : %{customdata[1]}<extra></extra>"))
-    taux = t[RETENU]["taux_positifs"]
-    fig.add_vline(x=taux, line_dash="dot", line_color=MUET, annotation_text=f"hasard {virgule(taux, 2)}",
-                  annotation_position="bottom right", annotation_font=dict(size=11, color=MUET))
-    fig.update_yaxes(autorange="reversed")
-    return mise_en_page(fig, 300, xaxis=dict(title="PR-AUC (test 2025)", range=[0, 1]), showlegend=False)
-
-
-@app.callback(Output("modele-questions", "figure"), Input("onglets", "value"))
-def fig_questions(_) -> go.Figure:
-    q = {k: v for k, v in METRIQUES["questions"].items() if isinstance(v, dict)}
-    fig = go.Figure()
-    for i, (nom, r) in enumerate(q.items()):
-        e = r["test"]["ecart_pr_auc"]
-        question, famille = nom.split(" | ")
-        y = f"{question} · {famille}"
-        fig.add_trace(go.Scatter(x=[e["ecart"]], y=[y], mode="markers", showlegend=False,
-                                 marker=dict(size=10, color=COULEUR["FR"] if "Q1" in question else COULEUR["IT"],
-                                             line=dict(color=SURFACE, width=2)),
-                                 error_x=dict(type="data", symmetric=False, array=[e["ic95"][1] - e["ecart"]],
-                                              arrayminus=[e["ecart"] - e["ic95"][0]], color=ENCRE2, thickness=1.5, width=6),
-                                 hovertemplate=f"{y}<br>écart {e['ecart']:+.4f}<br>IC 95 % [{e['ic95'][0]:+.4f} ; "
-                                               f"{e['ic95'][1]:+.4f}]<extra></extra>"))
-    fig.add_vline(x=0, line_color=AXE, line_width=1.5)
-    fig.update_yaxes(autorange="reversed")
-    return mise_en_page(fig, 300, xaxis=dict(title="écart de PR-AUC (avec − sans)", tickformat="+.3f"))
-
-
-@app.callback(Output("modele-topk", "figure"), Input("onglets", "value"))
-def fig_topk(_) -> go.Figure:
-    test = EVAL[EVAL["jeu"] == "test"]
-    lignes = []
-    for mois, g in test.groupby("mois"):
-        lignes.append({"mois": mois, "modele": g.nlargest(100, "score")["cible"].mean() * 100,
-                       "reference": g.nlargest(100, "score_reference")["cible"].mean() * 100,
-                       "hasard": g["cible"].mean() * 100})
-    t = pd.DataFrame(lignes)
-    fig = go.Figure()
-    for col, nom, coul, tiret in (("modele", "Régression logistique", COULEUR["FR"], None),
-                                  ("reference", "Règle : signalée l'année précédente", GRIS_REF, None),
-                                  ("hasard", "Hasard (taux de positifs du mois)", AXE, "dot")):
-        fig.add_trace(go.Scatter(x=t["mois"], y=t[col], name=nom, mode="lines+markers", line=dict(color=coul, width=2, dash=tiret),
-                                 marker=dict(size=8, line=dict(color=SURFACE, width=2)),
-                                 hovertemplate=nom + " : %{y:.0f} %<extra></extra>"))
-    return mise_en_page(fig, 340, hovermode="x unified", yaxis=dict(title="% des 100 signalées ensuite", range=[0, 102]))
-
-
-@app.callback(Output("prev-tableau", "children"), Input("prev-classe", "value"), Input("prev-affichee", "value"))
-def tableau_prevision(classe: str, affichee: str):
-    p = PREVISION.merge(SUB[["atc5", "nom", "nb_signalements"]], on="atc5", how="left")
-    if classe != "tout":
-        p = p[p["atc5"].str[0] == classe]
-    if affichee == "non":
-        p = p[p["fr_affichee_3m"].fillna(0) == 0]
-    df = pd.DataFrame({"Rang": p["rang"], "Substance": p["nom"].fillna(p["atc5"]), "ATC": p["atc5"],
-                       "Risque (%)": (p["score"] * 100).round(0).astype(int),
-                       "Signalements 2025": p["sig_an_prec"].astype("Int64"),
-                       "Affichée FR (3 mois)": np.where(p["fr_affichee_3m"].fillna(0) == 1, "oui", ""),
-                       "Italie (3 mois)": np.where(p["it_affichee_3m"].fillna(0) == 1, "oui", ""),
-                       "Allemagne (3 mois)": np.where(p["de_affichee_3m"].fillna(0) == 1, "oui", ""),
-                       "Liste critique UE": np.where(p["ue_critique"] == 1, "oui", "")})
-    return [html.P(f"{len(df)} substances ; {(p['score'] >= 0.5).sum()} à plus de 50 %.", className="sous-titre"),
-            tableau(df, sort_action="native", filter_action="native", page_size=15)]
 
 
 if __name__ == "__main__":

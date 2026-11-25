@@ -1,7 +1,6 @@
 """Construit les petites tables du dashboard (dashboard/donnees/*.parquet, versionnées).
 
-Lit data/clean/ et data/final/ (non versionnés, régénérés par `python -m nettoyage`), et outputs/
-(`python -m analyse.modeles` puis `python -m analyse.prediction`). L'enseignant lance ensuite le dashboard
+Lit data/clean/ et data/final/ (non versionnés, régénérés par `python -m nettoyage`). L'enseignant lance ensuite le dashboard
 sans reconstruire les 500 Mo de données :
 
     .venv/bin/python dashboard/construire_donnees.py
@@ -18,7 +17,7 @@ from scipy.cluster.hierarchy import leaves_list, linkage
 
 ICI = Path(__file__).resolve().parent
 RACINE = ICI.parent
-CLEAN, FINAL, SORTIES = RACINE / "data" / "clean", RACINE / "data" / "final", RACINE / "outputs"
+CLEAN, FINAL = RACINE / "data" / "clean", RACINE / "data" / "final"
 SORTIE = ICI / "donnees"
 
 PAYS = ["FR", "IT", "DE"]
@@ -39,13 +38,6 @@ def famille_cause(raison: object) -> str:
         return "Non renseignée"
     texte = raison.lower()
     return next((nom for nom, motif in FAMILLES if re.search(motif, texte)), "Autre")
-
-
-def dernier(nom: str) -> Path:
-    fichiers = sorted(SORTIES.glob(nom))
-    if not fichiers:
-        raise SystemExit(f"{nom} introuvable dans outputs/ : lancer python -m analyse.modeles puis analyse.prediction")
-    return fichiers[-1]
 
 
 def mois_actifs(ep: pd.DataFrame, couverture: dict, fin: pd.Period) -> pd.DataFrame:
@@ -79,9 +71,6 @@ def main() -> None:
                                                  "ue_liste_critique"))
     panel = pd.read_parquet(FINAL / "panel_fr.parquet")
     photos_fr, photos_eu = lire("ansm_observations"), lire("europe_observations")
-    metriques = json.loads(dernier("metriques_*.json").read_text())
-    pred_eval = pd.read_parquet(dernier("predictions_*.parquet"))
-    prediction = pd.read_parquet(dernier("prediction_*.parquet"))
 
     # Période observée de chaque pays : de la première à la dernière photo archivée
     photos = pd.concat([photos_fr[["date_photo"]].drop_duplicates().assign(pays="FR"),
@@ -128,8 +117,6 @@ def main() -> None:
     derniere = conso[conso["annee"] == annee_conso].set_index("atc5")
     sub["boites"] = sub["atc5"].map(derniere["boites"])
     sub["nb_presentations"] = sub["atc5"].map(derniere["nb_presentations"])
-    sub["score"] = sub["atc5"].map(prediction.set_index("atc5")["score"])
-    sub["rang"] = sub["atc5"].map(prediction.set_index("atc5")["rang"]).astype("Int64")
     sub.to_parquet(SORTIE / "substances.parquet", index=False)
 
     # ── Séries mensuelles par pays : pénuries en cours et nouvelles ─────────────────────────
@@ -187,22 +174,11 @@ def main() -> None:
     parts.reset_index().to_parquet(SORTIE / "panel_signaux.parquet", index=False)
     manquants = panel.drop(columns=["atc5", "mois", "cible", "annee", "mois_num", "jeu"]).isna().mean()
 
-    # ── Modèle : prédictions de validation et de test, et prédiction du mois courant ───────
-    # Avec la référence « signalée l'année précédente » (même formule que analyse/modeles.py), pour comparer
-    histo = panel[["atc5", "mois", "sig_an_prec", "sig_cumul_avant"]]
-    pred_eval = pred_eval.merge(histo, on=["atc5", "mois"], how="left")
-    pred_eval["score_reference"] = (pred_eval["sig_an_prec"].astype("float64").fillna(0)
-                                    + 1e-3 * pred_eval["sig_cumul_avant"].astype("float64").fillna(0))
-    pred_eval = pred_eval.drop(columns=["sig_an_prec", "sig_cumul_avant"])
-    pred_eval.to_parquet(SORTIE / "predictions_evaluation.parquet", index=False)
-    prediction.drop(columns=["annee", "mois_num"]).to_parquet(SORTIE / "prediction_courante.parquet", index=False)
-
     meta = {"ordres_atc2": ordres, "min_taille_atc2": MIN_TAILLE,
             "couverture": {p: str(m) for p, m in couverture.items()}, "dernier_mois": str(fin),
             "annee_conso": annee_conso, "panel_lignes": int(len(panel)), "panel_substances": int(panel["atc5"].nunique()),
             "panel_mois": [str(panel["mois"].min().date())[:7], str(panel["mois"].max().date())[:7]],
-            "episodes": int(len(ev)), "manquants_panel": {k: float(v) for k, v in manquants.items()},
-            "metriques": metriques, "mois_prediction": str(prediction["mois"].iat[0].date())[:7]}
+            "episodes": int(len(ev)), "manquants_panel": {k: float(v) for k, v in manquants.items()}}
     (SORTIE / "meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=1))
     for f in sorted(SORTIE.glob("*")):
         print(f"{f.name:30s} {f.stat().st_size / 1024:8.0f} Ko")
