@@ -30,6 +30,7 @@ import pandas as pd
 from .commun import CLEAN, RACINE, enregistrer
 
 FINAL = RACINE / "data" / "final"
+VERSION = "v1"  # à incrémenter quand les colonnes ou la définition de la cible changent
 MOIS = pd.period_range("2019-01", "2025-12", freq="M")  # période couverte par les signalements
 HORIZON = 3
 T = len(MOIS) - HORIZON  # dernier t : ses 3 mois de cible sont complets
@@ -163,6 +164,11 @@ def construire():
     copie = dossier / f"niveau3_{date.today().isoformat()}.json"
     shutil.copyfile(FINAL / "manifeste.json", copie)
     print(f"  manifeste copié dans {copie.relative_to(RACINE)} (à commiter)")
+    # Version datée et figée (étape 8, cours 2) : panel_fr.parquet est réécrit à chaque construction,
+    # la version datée ne l'est jamais ; son manifeste est la copie ci-dessus (même date).
+    version = FINAL / f"panel_fr_{VERSION}_{date.today().isoformat()}.parquet"
+    shutil.copyfile(FINAL / "panel_fr.parquet", version)
+    print(f"  version figée : {version.relative_to(RACINE)} (manifeste : {copie.relative_to(RACINE)})")
 
 
 def controler(table, avec, evenements, tout):

@@ -367,8 +367,16 @@ que le modèle : l'historique de signalements de la substance porte l'essentiel 
 sans la variable, écart de PR-AUC sur le test, IC 95 % par bootstrap apparié sur les substances) : Q1 +0,0002
 [−0,0003 ; +0,0006] ; Italie +0,0030 [−0,0000 ; +0,0062] en logistique, −0,0007 [−0,0064 ; +0,0053] en boosting.
 Aucun apport significatif ; l'Italie est à la limite et seulement en logistique. Le modèle retenu est dans `models/`,
-les métriques et les prédictions de validation et de test dans `outputs/`. Restent : la table de prédiction (étape 7)
-et la version datée de `panel_fr` (étape 8).
+les métriques et les prédictions de validation et de test dans `outputs/`.
+
+**Étapes 7 et 8 faites.** `analyse/prediction.py` recalcule les variables pour une seule date, sans la cible : par
+défaut le mois de la dernière photo des pages de pénurie (10/2026), soit un risque pour 11/2026 → 01/2027.
+Signalements jusqu'en 2025 et consommation 2025 seulement (années civiles précédentes), comme dans le panel. Contrôle :
+le même code appliqué à 09/2025 redonne exactement les variables de `panel_fr` (1 231 substances). Sortie :
+`outputs/prediction_<mois>_<jour>.parquet`, triée par risque. Le modèle n'est pas réentraîné sur 2024-2025 : c'est le
+modèle évalué ci-dessus, tel quel. `python -m nettoyage panel` écrit en plus une version figée
+`data/final/panel_fr_v1_<jour>.parquet`, dont le manifeste est `manifestes/niveau3_<jour>.json` (même contenu, même
+empreinte que le 23/11).
 
 Le plan suit l'ordre imposé par le cours 1 (diapos 53 à 63).
 

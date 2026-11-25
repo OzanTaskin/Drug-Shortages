@@ -32,6 +32,7 @@ qui ne sont jamais en pénurie. L'Italie et l'Allemagne servent de signaux. Dét
 | Livrable 1 : rapport de 2 pages | ✅ `Rapport-DALAS-Deliverable1/` |
 | Niveau 3 : table d'entraînement `panel_fr` | ✅ 99 063 lignes (1 223 substances × 81 mois), cible, 11 variables, découpage temporel ; 9 contrôles ; voir [EXPLICATIONS.md](EXPLICATIONS.md), section 6 |
 | Étape 6 : référence et modèles, test de Q1/Q2 | ✅ `analyse/modeles.py` : la régression logistique (PR-AUC test 0,753) bat de peu la référence « signalée l'année précédente » (0,738) ; Q1 et Q2 n'apportent rien de significatif |
+| Étapes 7 et 8 : table de prédiction, version figée du panel | ✅ `analyse/prediction.py` : risque de chaque substance pour 11/2026 → 01/2027 ; `data/final/panel_fr_v1_<jour>.parquet` |
 | TME6 : dashboard | ⏳ |
 | TME9 : rapport final | ⏳ |
 
@@ -50,6 +51,7 @@ python3 -m venv .venv
 .venv/bin/python -m analyse.description     # description chiffrée du dataset (tableaux du rapport)
 .venv/bin/python -m analyse.faisabilite    # faisabilité chiffrée sur panel_fr : cible, Q1 et Q2, bruts puis contrôlés
 .venv/bin/python -m analyse.modeles        # étape 6 : références, modèles, Q1/Q2 → models/ et outputs/ (environ 30 s)
+.venv/bin/python -m analyse.prediction     # étape 7 : risque prédit pour le mois courant → outputs/prediction_*.parquet
 ```
 
 - Étapes isolées : `python -m collecte actuelles wayback`, `python -m nettoyage controles`.
@@ -98,6 +100,7 @@ analyse/diagnostics.py    graphiques de contrôle : tailles des archives, lignes
 analyse/description.py    description du dataset : dimensions, couverture, durées, gravité, causes, analyse exploratoire (manquants, asymétrie, corrélations)
 analyse/faisabilite.py    faisabilité : taux de cas positifs, repère naïf, exposition pour Q1 et Q2
 analyse/modeles.py        étape 6 : références à battre, modèles, Q1/Q2 avec et sans, intervalles par bootstrap
+analyse/prediction.py     étape 7 : variables d'une seule date (mois courant), sans la cible, et score du modèle retenu
 Rapport-DALAS-Deliverable1/ rapport du livrable 1 (LaTeX et PDF)
 ```
 
