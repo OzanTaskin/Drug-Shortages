@@ -9,7 +9,7 @@ les méthodes vues en cours.
 | **README.md** (ce fichier) | le projet en bref, comment lancer le code |
 | [Rapport-DALAS-Deliverable1/build/Rapport-DALAS-Deliverable1.pdf](Rapport-DALAS-Deliverable1/build/Rapport-DALAS-Deliverable1.pdf) | **le rapport du livrable 1** (2 pages) : questions, collecte, description quantitative, prétraitement |
 | [EXPLICATIONS.md](EXPLICATIONS.md) | **l'explication détaillée** : chaque source, chaque table, chaque choix, et pourquoi, au regard des cours ; la suite du projet |
-| [dashboard/README.md](dashboard/README.md) | **le dashboard** : lancement, les sept vues |
+| [dashboard/README.md](dashboard/README.md) | **le dashboard** : lancement, les six vues |
 | [CHANGELOG_DATA.md](CHANGELOG_DATA.md) | une ligne par changement des données : date, auteur, quoi, pourquoi |
 | `manifestes/` | l'état exact des tables à chaque construction de référence (lignes, sommes, empreintes) |
 
